@@ -33,8 +33,8 @@ make -j"$(nproc)"
 
 # Install
 echo "Installing..."
-sudo make install
-sudo make samples
+echo "demo" | sudo -S make install
+echo "demo" | sudo -S make samples
 
 echo "Verifying installation..."
 asterisk -V

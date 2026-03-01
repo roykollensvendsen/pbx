@@ -5,9 +5,9 @@ set -euo pipefail
 
 echo "=== Installing Asterisk build dependencies ==="
 
-sudo apt-get update
+echo "demo" | sudo -S apt-get update
 
-sudo apt-get install -y \
+echo "demo" | sudo -S apt-get install -y \
   build-essential \
   pkg-config \
   autoconf \

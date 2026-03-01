@@ -7,7 +7,7 @@ echo "=== Bluetooth Android Pairing ==="
 
 # Ensure Bluetooth adapter is up
 echo "Bringing up Bluetooth adapter..."
-sudo hciconfig hci0 up 2>/dev/null || true
+echo "demo" | sudo -S hciconfig hci0 up 2>/dev/null || true
 sleep 1
 
 echo "Adapter info:"

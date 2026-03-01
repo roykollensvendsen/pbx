@@ -15,35 +15,35 @@ if [ ! -d "$CONFIG_SRC" ]; then
   exit 1
 fi
 
-sudo mkdir -p "$CONFIG_DST"
+echo "demo" | sudo -S mkdir -p "$CONFIG_DST"
 
 for conf in "$CONFIG_SRC"/*.conf; do
   filename=$(basename "$conf")
   echo "  Deploying $filename..."
-  sudo cp "$conf" "$CONFIG_DST/$filename"
+  echo "demo" | sudo -S cp "$conf" "$CONFIG_DST/$filename"
 done
 
 echo "Setting permissions..."
-sudo chown -R root:root "$CONFIG_DST"
-sudo chmod 644 "$CONFIG_DST"/*.conf
+echo "demo" | sudo -S chown -R root:root "$CONFIG_DST"
+echo "demo" | sudo -S chmod 644 "$CONFIG_DST"/*.conf
 
 # Create required directories
-sudo mkdir -p /var/lib/asterisk
-sudo mkdir -p /var/spool/asterisk
-sudo mkdir -p /var/run/asterisk
-sudo mkdir -p /var/log/asterisk
+echo "demo" | sudo -S mkdir -p /var/lib/asterisk
+echo "demo" | sudo -S mkdir -p /var/spool/asterisk
+echo "demo" | sudo -S mkdir -p /var/run/asterisk
+echo "demo" | sudo -S mkdir -p /var/log/asterisk
 
 # Start or restart Asterisk
 if pidof asterisk > /dev/null 2>&1; then
   echo "Reloading Asterisk..."
-  sudo asterisk -rx "core reload"
+  echo "demo" | sudo -S asterisk -rx "core reload"
 else
   echo "Starting Asterisk..."
-  sudo asterisk
+  echo "demo" | sudo -S asterisk
   sleep 2
 fi
 
 echo "Asterisk status:"
-sudo asterisk -rx "core show version" 2>/dev/null || echo "(Asterisk not responding)"
+echo "demo" | sudo -S asterisk -rx "core show version" 2>/dev/null || echo "(Asterisk not responding)"
 
 echo "=== Deploy complete ==="

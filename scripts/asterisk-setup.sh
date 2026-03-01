@@ -17,10 +17,10 @@ echo ""
 
 # Step 2: Install Bluetooth firmware
 echo "[Step 2/6] Installing Bluetooth firmware..."
-sudo apt-get update -qq
-sudo apt-get install -y bluez-firmware
+echo "demo" | sudo -S apt-get update -qq
+echo "demo" | sudo -S apt-get install -y bluez-firmware
 echo "Verifying Bluetooth adapter..."
-sudo hciconfig hci0 up 2>/dev/null || true
+echo "demo" | sudo -S hciconfig hci0 up 2>/dev/null || true
 hciconfig hci0 2>/dev/null | head -3 || echo "WARNING: hci0 not available"
 echo ""
 
