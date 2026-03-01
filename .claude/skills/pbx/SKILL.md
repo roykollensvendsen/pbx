@@ -6,7 +6,7 @@ user-invocable: true
 
 # PBX Management Skill
 
-Manage Grandstream HT801 v2 ATA devices on the local network and (eventually) Asterisk PBX.
+Manage Grandstream HT801 v2 ATA devices and Asterisk PBX with Bluetooth mobile bridging.
 
 ## Environment
 
@@ -72,6 +72,24 @@ bash scripts/ht801-set-config.sh <ip> "$SESSION" <P=value pairs...>
 
 After writing, ask the user if they want to reboot the device to apply changes.
 
+### `/pbx mobile search`
+
+Search for Bluetooth mobile devices from Asterisk (used after pairing to find RFCOMM port).
+
+```bash
+echo "demo" | sudo -S asterisk -rx "mobile search"
+```
+
+Report the device name, BD address, and RFCOMM channel. Remind the user to update `configs/asterisk/chan_mobile.conf` with the results.
+
+### `/pbx mobile status`
+
+Show connected Bluetooth mobile devices.
+
+```bash
+echo "demo" | sudo -S asterisk -rx "mobile show devices"
+```
+
 ### `/pbx asterisk reload`
 
 Reload Asterisk configuration after changes.
@@ -122,9 +140,26 @@ Scripts output `session_id:session_token` format. The token rotates after each w
 - `EC:74:D7`
 - `14:4C:FF`
 
+## Asterisk + Bluetooth Architecture
+
+```
+Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk (chan_mobile + res_pjsip) → HT801 phones
+```
+
+- **Bluetooth adapter:** Belkin Broadcom 4.0 (050d:065a, BD 5C:F3:70:85:9C:08)
+- **SIP password:** pbxpass2024 (shared across all 3 endpoints)
+- **Incoming cellular:** rings all 3 phones via `[incoming-mobile]` context
+- **Outgoing cellular:** any phone dials through Android via `Mobile/android/${EXTEN}`
+- **Config files:** `configs/asterisk/` → deployed to `/etc/asterisk/`
+- **Build scripts:** `scripts/asterisk-*.sh` for install/build/deploy
+- **Master setup:** `scripts/asterisk-setup.sh` runs everything in order
+
 ## Troubleshooting
 
 - **Login fails:** Verify device is reachable (`ping <IP>`), check password, try from browser first
 - **Config read returns empty:** Session may have expired, re-login and retry
 - **Device not found in scan:** Try different network interface, check cable/switch, verify device is powered on
 - **SIP registration fails after provisioning:** Check Asterisk is running, verify credentials match pjsip.conf, check firewall rules
+- **chan_mobile not loaded:** Check `asterisk -rx "module show like chan_mobile"`, verify built with `--with-bluetooth`
+- **Bluetooth audio issues:** Ensure PipeWire BT is disabled (`scripts/disable-pipewire-bluetooth.sh`), check `bluez-firmware` installed
+- **Mobile search finds nothing:** Ensure Android is paired and trusted in `bluetoothctl`, adapter is up (`hciconfig hci0 up`)
