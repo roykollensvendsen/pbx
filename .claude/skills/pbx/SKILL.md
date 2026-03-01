@@ -1,7 +1,7 @@
 ---
 name: pbx
 description: Manage Grandstream HT801 v2 ATA devices and PBX infrastructure
-user_invocable: true
+user-invocable: true
 ---
 
 # PBX Management Skill
