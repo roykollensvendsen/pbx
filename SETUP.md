@@ -219,8 +219,22 @@ echo "demo" | sudo -S asterisk -rx "mobile show devices"     # Android: Connecte
 Test calls:
 - **Echo test:** Dial `*43` from any phone — hear your voice echoed back
 - **Internal:** Dial ext 101 → 102
-- **Incoming cellular:** Call the Android phone number → all 3 phones ring
+- **Incoming cellular:** Call the Android phone number → all 3 phones ring, voicemail after 25s if no answer
 - **Outgoing cellular:** Pick up any phone, dial a number → goes through Android
+- **Voicemail check:** Dial `100` from any phone, enter PIN `1234`
+
+### Available extensions
+
+| Extension | Purpose |
+|-----------|---------|
+| 100 | Check voicemail (PIN: 1234) |
+| 101 | Phone 1 (192.168.10.138) |
+| 102 | Phone 2 (192.168.10.194) |
+| 103 | Phone 3 (192.168.10.100) |
+| *43 | Echo test (note: star codes unreliable from HT801 keypads) |
+
+> **Important:** HT801 v2 phones only reliably send extensions in the `10x` range (100–109).
+> Star codes and other numbers are silently dropped. See Known Gotchas.
 
 ## Known Gotchas
 

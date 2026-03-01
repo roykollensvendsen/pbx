@@ -149,13 +149,46 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 - **Bluetooth adapter:** Belkin Broadcom 4.0 (050d:065a, BD 5C:F3:70:85:9C:08)
 - **Android phone:** Roy sin XCover7 Pro (E4:9F:7D:2F:A7:2D, RFCOMM port 4)
 - **SIP auth:** None (HT801 v2 API cannot write P34 passwords; trusted LAN)
-- **Incoming cellular:** rings all 3 phones via `[incoming-mobile]` context
+- **Incoming cellular:** rings all 3 phones via `[incoming-mobile]` context, voicemail after 25s
 - **Outgoing cellular:** any phone dials through Android via `Mobile/android/${EXTEN}`
-- **Echo test:** `*43` from any phone
+- **Echo test:** `*43` from any phone (note: star codes unreliable on HT801 keypads)
+- **Voicemail check:** dial `100` from any phone, PIN `1234`
 - **Config files:** `configs/asterisk/` → deployed to `/etc/asterisk/`
 - **Build scripts:** `scripts/asterisk-*.sh` for install/build/deploy
 - **Master setup:** `scripts/asterisk-setup.sh` runs all automated steps
 - **BT adapter may be hci1** after firmware reload (not hci0)
+
+## Extensions and Dial Codes
+
+| Extension | Purpose | HT801 compatible |
+|-----------|---------|-----------------|
+| 100 | Check voicemail (PIN: 1234) | Yes |
+| 101 | Phone 1 (192.168.10.138) | Yes |
+| 102 | Phone 2 (192.168.10.194) | Yes |
+| 103 | Phone 3 (192.168.10.100) | Yes |
+| *43 | Echo test | No (star code) |
+| Any 3+ digits | Outgoing call via Android | N/A |
+
+**Note:** HT801 v2 only reliably sends 10x-pattern extensions (100–109). Star codes and arbitrary numbers are silently dropped by the phone.
+
+## Incoming Cellular Call Flow
+
+1. Android receives cellular call → chan_mobile triggers `[incoming-mobile]`
+2. All 3 phones ring simultaneously (Originate to each)
+3. A 25-second watchdog timer starts (`[mobile-vm-watchdog]`)
+4. **If answered:** answering phone(s) join ConfBridge — multiple phones can answer
+5. **If not answered in 25s:** watchdog kicks caller from ConfBridge → falls through to VoiceMail
+6. When the cellular caller hangs up, all connected phones are disconnected (marked user)
+
+### Config files involved
+
+| File | Purpose |
+|------|---------|
+| `extensions.conf` | Dialplan: `[internal]`, `[incoming-mobile]`, `[conf-mobile-join]`, `[mobile-vm-watchdog]` |
+| `confbridge.conf` | Conference profiles: `[mobile-bridge]`, `[mobile-caller]` (marked), `[mobile-phone]` (unmarked) |
+| `voicemail.conf` | Mailbox 100 in `[default]` context, PIN 1234 |
+| `pjsip.conf` | SIP endpoints 101/102/103 (no auth, trusted LAN) |
+| `chan_mobile.conf` | Bluetooth adapter + Android phone config |
 
 ## Troubleshooting
 
