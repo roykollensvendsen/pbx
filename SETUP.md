@@ -183,6 +183,14 @@ Test calls:
 - **Incoming cellular:** Call the Android phone number → all 3 phones ring
 - **Outgoing cellular:** Pick up any phone, dial a number → goes through Android
 
+## Known Gotchas
+
+- **`sudo` in scripts:** Always use `echo "demo" | sudo -S` instead of bare `sudo`. Non-interactive shells (e.g. Claude Code's Bash tool) have no TTY, so `sudo` without `-S` fails with "a terminal is required to read the password".
+- **Asterisk source ownership:** `sudo tar xzf` extracts files owned by root. You must `chown -R demo:demo` the source directory before running `./configure`, otherwise it fails writing to `config.log`.
+- **Asterisk not in Debian Trixie repos:** Must build from source. The `asterisk-setup.sh` script handles this end-to-end.
+- **PipeWire steals Bluetooth audio:** PipeWire's WirePlumber claims HFP/HSP profiles on the BT adapter, preventing Asterisk's `chan_mobile` from getting SCO audio. The WirePlumber override in `configs/wireplumber/90-disable-bluetooth.conf` disables this. Must be applied before starting Asterisk.
+- **Asterisk must run as root:** Required for Bluetooth SCO socket access. Configured in `configs/asterisk/asterisk.conf` (`runuser = root`).
+
 ## Notes
 
 - MX Linux live session runs entirely in RAM — nothing persists across reboots.
