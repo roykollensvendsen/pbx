@@ -235,6 +235,8 @@ Test calls:
 - **Bluetooth pairing direction:** Pairing MUST be initiated from the Android phone, not from the PBX. When initiated from the PBX via `bluetoothctl pair`, the link keys are not stored (bonding fails silently). Make the PBX discoverable with `bluetoothctl discoverable on` and pair from Android Settings.
 - **HT801 v2 SIP password (P34):** The Grandstream HT801 v2 config API silently ignores writes to P34 (auth password). The API returns success but the value is not persisted. Workaround: use no SIP auth in pjsip.conf (acceptable on trusted LAN).
 - **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
+- **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features (e.g., `100` for voicemail check).
+- **HT801 v2 P290 and `+` encoding:** The `+` character in P290 (Dial Plan) values is silently converted to a space because the config API uses `application/x-www-form-urlencoded`. Use `x.` instead of `x+` in dial plan patterns.
 
 ## Notes
 

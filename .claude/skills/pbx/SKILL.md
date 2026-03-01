@@ -173,3 +173,5 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 - **Broadcom firmware missing:** Check `dmesg | grep BCM` — if "firmware Patch file not found", download `BCM20702A1-050d-065a.hcd` to `/lib/firmware/brcm/` and reload btusb
 - **PipeWire stealing BT audio:** Run `scripts/disable-pipewire-bluetooth.sh`, verify with `wpctl status` (no BT devices)
 - **chan_mobile not reloading:** `core reload` does NOT work for chan_mobile. Must `module unload chan_mobile.so` then `module load chan_mobile.so`
+- **HT801 v2 only dials 10x extensions:** The phone silently drops numbers that don't match its built-in patterns. Extensions 100–109 work. Star codes (*97, *86) and arbitrary numbers (123) are never sent as SIP INVITEs. Use 10x-range for all custom extensions.
+- **P290 `+` encoding:** The `+` in dial plan values becomes a space due to URL encoding. Use `x.` not `x+`.
