@@ -58,15 +58,43 @@ git push -u origin main
 ```bash
 touch .gitkeep
 git add .gitkeep
-git commit -m "Initial commit"
+git commit -m "chore: initial commit"
 ```
 
-## 8. Launch Claude Code
+## 8. Install Commitlint
+
+```bash
+npm init -y
+npm install --save-dev @commitlint/cli @commitlint/config-conventional
+```
+
+Create `commitlint.config.js`:
+
+```js
+module.exports = {
+  extends: ['@commitlint/config-conventional'],
+};
+```
+
+## 9. Set Up Commit-msg Git Hook
+
+```bash
+cat > .git/hooks/commit-msg << 'HOOK'
+#!/bin/bash
+
+npx --no -- commitlint --edit "$1"
+HOOK
+chmod +x .git/hooks/commit-msg
+```
+
+## 10. Launch Claude Code
 
 ```bash
 cd ~/phone-home
 claude
 ```
+
+> Claude Code will automatically read `CLAUDE.md` for project conventions.
 
 ## Notes
 
