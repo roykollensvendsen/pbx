@@ -236,6 +236,57 @@ Test calls:
 > **Important:** HT801 v2 phones only reliably send extensions in the `10x` range (100–109).
 > Star codes and other numbers are silently dropped. See Known Gotchas.
 
+## 14. AI Phone Agent (Claude-powered)
+
+An AI receptionist answers incoming cellular calls when nobody picks up the phone.
+Uses Deepgram (STT) → Claude (brain) → ElevenLabs (TTS) pipeline via Asterisk AudioSocket.
+
+### 14a. Configure API keys
+
+```bash
+cp agent/.env.example agent/.env
+```
+
+Edit `agent/.env` and fill in:
+- `ANTHROPIC_API_KEY` — from console.anthropic.com
+- `DEEPGRAM_API_KEY` — from console.deepgram.com
+- `ELEVENLABS_API_KEY` — from elevenlabs.io
+- `ELEVENLABS_VOICE_ID` — voice ID from ElevenLabs voice library
+
+### 14b. Install dependencies
+
+```bash
+npm install
+```
+
+### 14c. Start the agent
+
+```bash
+npm run agent
+```
+
+Or for echo test (no API keys needed):
+```bash
+npm run agent:echo
+```
+
+### 14d. Test
+
+- **Echo test:** Start with `npm run agent:echo`, dial `104` from any phone — hear yourself echoed back
+- **AI test:** Start with `npm run agent`, dial `104` from any phone — speak Norwegian, hear AI response
+- **Incoming call test:** Call the Android phone from outside — phones ring 15s, then AI answers
+
+### Available extensions (updated)
+
+| Extension | Purpose |
+|-----------|---------|
+| 100 | Check voicemail (PIN: 1234) |
+| 101 | Phone 1 (192.168.10.138) |
+| 102 | Phone 2 (192.168.10.194) |
+| 103 | Phone 3 (192.168.10.100) |
+| 104 | AI agent (Claude-powered receptionist) |
+| *43 | Echo test (note: star codes unreliable from HT801 keypads) |
+
 ## Known Gotchas
 
 - **`sudo` in scripts:** Always use `echo "demo" | sudo -S` instead of bare `sudo`. Non-interactive shells (e.g. Claude Code's Bash tool) have no TTY, so `sudo` without `-S` fails with "a terminal is required to read the password".

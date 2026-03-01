@@ -13,7 +13,7 @@ Manage Grandstream HT801 v2 ATA devices and Asterisk PBX with Bluetooth mobile b
 - **Machine IP:** 192.168.10.107
 - **Network:** 192.168.10.0/24
 - **Device admin password:** Garasje123
-- **Extensions:** 101, 102, 103
+- **Extensions:** 101, 102, 103, 104 (AI agent)
 - **Helper scripts:** `scripts/` directory in project root
 
 ## Sub-commands
@@ -90,6 +90,32 @@ Show connected Bluetooth mobile devices.
 echo "demo" | sudo -S asterisk -rx "mobile show devices"
 ```
 
+### `/pbx agent start`
+
+Start the AI phone agent server.
+
+```bash
+cd /home/demo/phone-home && npm run agent
+```
+
+If `agent/.env` is missing, tell the user to copy from `agent/.env.example` and fill in API keys.
+
+### `/pbx agent echo`
+
+Start the AI phone agent in echo mode (no API keys needed, for testing AudioSocket).
+
+```bash
+cd /home/demo/phone-home && npm run agent:echo
+```
+
+### `/pbx agent stop`
+
+Stop the AI phone agent server.
+
+```bash
+pkill -f "node agent/server.js"
+```
+
 ### `/pbx asterisk reload`
 
 Reload Asterisk configuration after changes.
@@ -149,7 +175,7 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 - **Bluetooth adapter:** Belkin Broadcom 4.0 (050d:065a, BD 5C:F3:70:85:9C:08)
 - **Android phone:** Roy sin XCover7 Pro (E4:9F:7D:2F:A7:2D, RFCOMM port 4)
 - **SIP auth:** None (HT801 v2 API cannot write P34 passwords; trusted LAN)
-- **Incoming cellular:** rings all 3 phones via `[incoming-mobile]` context, voicemail after 25s
+- **Incoming cellular:** rings all 3 phones 15s, then AI agent via AudioSocket, then voicemail
 - **Outgoing cellular:** any phone dials through Android via `Mobile/android/${EXTEN}`
 - **Echo test:** `*43` from any phone (note: star codes unreliable on HT801 keypads)
 - **Voicemail check:** dial `100` from any phone, PIN `1234`
@@ -166,6 +192,7 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 | 101 | Phone 1 (192.168.10.138) | Yes |
 | 102 | Phone 2 (192.168.10.194) | Yes |
 | 103 | Phone 3 (192.168.10.100) | Yes |
+| 104 | AI agent (Claude-powered receptionist) | Yes |
 | *43 | Echo test | No (star code) |
 | Any 3+ digits | Outgoing call via Android | N/A |
 
@@ -174,11 +201,11 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 ## Incoming Cellular Call Flow
 
 1. Android receives cellular call → chan_mobile triggers `[incoming-mobile]`
-2. All 3 phones ring simultaneously (Originate to each)
-3. A 25-second watchdog timer starts (`[mobile-vm-watchdog]`)
-4. **If answered:** answering phone(s) join ConfBridge — multiple phones can answer
-5. **If not answered in 25s:** watchdog kicks caller from ConfBridge → falls through to VoiceMail
-6. When the cellular caller hangs up, all connected phones are disconnected (marked user)
+2. All 3 phones ring simultaneously for 15 seconds
+3. **If answered:** call connects to answering phone
+4. **If not answered in 15s:** AI agent picks up via AudioSocket (Node.js server on port 9092)
+5. AI greets caller in Norwegian, has conversation via STT → Claude → TTS pipeline
+6. If AI agent server is not running, falls through to voicemail
 
 ### Config files involved
 
