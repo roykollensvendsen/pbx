@@ -103,7 +103,15 @@ HOOK
 chmod +x .git/hooks/commit-msg
 ```
 
-## 11. Launch Claude Code
+## 11. Install Network Tools
+
+```bash
+echo "demo" | sudo -S apt-get install -y nmap arp-scan
+```
+
+> Required for scanning the local network for Grandstream HT801 devices (`scripts/scan-devices.sh`).
+
+## 12. Launch Claude Code
 
 ```bash
 cd ~/phone-home
