@@ -147,19 +147,29 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 ```
 
 - **Bluetooth adapter:** Belkin Broadcom 4.0 (050d:065a, BD 5C:F3:70:85:9C:08)
-- **SIP password:** pbxpass2024 (shared across all 3 endpoints)
+- **Android phone:** Roy sin XCover7 Pro (E4:9F:7D:2F:A7:2D, RFCOMM port 4)
+- **SIP auth:** None (HT801 v2 API cannot write P34 passwords; trusted LAN)
 - **Incoming cellular:** rings all 3 phones via `[incoming-mobile]` context
 - **Outgoing cellular:** any phone dials through Android via `Mobile/android/${EXTEN}`
+- **Echo test:** `*43` from any phone
 - **Config files:** `configs/asterisk/` → deployed to `/etc/asterisk/`
 - **Build scripts:** `scripts/asterisk-*.sh` for install/build/deploy
-- **Master setup:** `scripts/asterisk-setup.sh` runs everything in order
+- **Master setup:** `scripts/asterisk-setup.sh` runs all automated steps
+- **BT adapter may be hci1** after firmware reload (not hci0)
 
 ## Troubleshooting
 
 - **Login fails:** Verify device is reachable (`ping <IP>`), check password, try from browser first
 - **Config read returns empty:** Session may have expired, re-login and retry
 - **Device not found in scan:** Try different network interface, check cable/switch, verify device is powered on
-- **SIP registration fails after provisioning:** Check Asterisk is running, verify credentials match pjsip.conf, check firewall rules
+- **SIP registration fails:** Check Asterisk is running, check firewall rules, note pjsip.conf has no auth (matching HT801 empty passwords)
 - **chan_mobile not loaded:** Check `asterisk -rx "module show like chan_mobile"`, verify built with `--with-bluetooth`
-- **Bluetooth audio issues:** Ensure PipeWire BT is disabled (`scripts/disable-pipewire-bluetooth.sh`), check `bluez-firmware` installed
-- **Mobile search finds nothing:** Ensure Android is paired and trusted in `bluetoothctl`, adapter is up (`hciconfig hci0 up`)
+- **"Unknown adapter" error:** The `adapter` field in `[android]` must match the `id` field value (e.g., `hci1`), NOT the section name
+- **"ast_io_wait() failed for audio":** SDP server not running — ensure bluetoothd has `--compat` flag
+- **"Failed to connect sdp":** Same as above — SDP server required. Fix: add `--compat` to bluetoothd in `/etc/init.d/bluetooth`, restart
+- **Pairing fails / link keys not stored:** Pair FROM the Android phone, not from the PBX. Make PBX discoverable first with `bluetoothctl discoverable on && bluetoothctl pairable on`
+- **"connect() failed (111)":** RFCOMM connection refused — phone not properly paired/bonded. Check `bluetoothctl info <addr>` shows `Bonded: yes`
+- **Adapter changed from hci0 to hci1:** Happens after btusb module reload for firmware. Update `chan_mobile.conf` with correct hciX name
+- **Broadcom firmware missing:** Check `dmesg | grep BCM` — if "firmware Patch file not found", download `BCM20702A1-050d-065a.hcd` to `/lib/firmware/brcm/` and reload btusb
+- **PipeWire stealing BT audio:** Run `scripts/disable-pipewire-bluetooth.sh`, verify with `wpctl status` (no BT devices)
+- **chan_mobile not reloading:** `core reload` does NOT work for chan_mobile. Must `module unload chan_mobile.so` then `module load chan_mobile.so`

@@ -131,39 +131,74 @@ This sets up Asterisk with chan_mobile to bridge cellular calls from an Android 
 bash scripts/asterisk-setup.sh
 ```
 
-This runs steps 1-6 automatically:
+This runs 8 steps automatically:
 1. Disables PipeWire Bluetooth (prevents HFP/HSP conflict with chan_mobile)
-2. Installs Bluetooth firmware (`bluez-firmware`)
-3. Installs Asterisk build dependencies
-4. Downloads and builds Asterisk 22 LTS from source with `chan_mobile`
-5. Opens UFW firewall ports (SIP 5060, RTP 10000-20000)
-6. Deploys Asterisk configs and starts Asterisk
+2. Installs `bluez-firmware` package
+3. Downloads Broadcom BCM20702A1 dongle firmware (not in bluez-firmware) and reloads btusb
+4. Enables BlueZ SDP server (`--compat` mode in `/etc/init.d/bluetooth`)
+5. Installs Asterisk build dependencies
+6. Downloads and builds Asterisk 22 LTS from source with `chan_mobile`
+7. Opens UFW firewall ports (SIP 5060, RTP 10000-20000)
+8. Deploys Asterisk configs and starts Asterisk
 
-### 13b. Pair Android phone via Bluetooth
+> **Note:** The script will detect the adapter name (may be `hci1` after btusb reload)
+> and tell you to update `chan_mobile.conf` accordingly.
+
+### 13b. Update chan_mobile.conf with adapter name
+
+After the setup script, check which `hciX` adapter is active:
 
 ```bash
-bash scripts/bluetooth-pair.sh
-```
-
-Follow the interactive prompts to scan, pair, and trust the Android phone.
-
-### 13c. Find RFCOMM channel and update chan_mobile.conf
-
-```bash
-sudo asterisk -rx "mobile search"
+hciconfig
 ```
 
 Edit `configs/asterisk/chan_mobile.conf`:
-- Set the Android phone's BD address
-- Set the RFCOMM port from the search results
+- Set `id = hciX` in the `[adapter]` section
+- Set `adapter = hciX` in the `[android]` section (must match the `id` value, NOT the section name)
 
-### 13d. Redeploy configs
+### 13c. Pair Android phone via Bluetooth
+
+**CRITICAL: Pairing must be initiated FROM the Android phone, not from the PBX.**
+Pairing from the PBX side fails to store link keys (bonding doesn't complete).
+
+```bash
+# Make PBX discoverable
+bluetoothctl discoverable on
+bluetoothctl pairable on
+```
+
+On the Android phone:
+1. Go to **Settings > Connected devices > Pair new device**
+2. Find and tap the PBX device (appears as "mx1" or similar)
+3. Accept the pairing prompt on both devices
+4. On Android, ensure **"Phone calls"** is enabled for the device
+
+Then back on the PBX:
+```bash
+bluetoothctl trust <ANDROID_BD_ADDRESS>
+```
+
+### 13d. Find RFCOMM channel and update chan_mobile.conf
+
+```bash
+echo "demo" | sudo -S asterisk -rx "mobile search"
+```
+
+Edit `configs/asterisk/chan_mobile.conf`:
+- Set `address = <ANDROID_BD_ADDRESS>` in the `[android]` section
+- Set `port = <RFCOMM_PORT>` from the search results
+
+### 13e. Redeploy configs and load chan_mobile
 
 ```bash
 bash scripts/asterisk-deploy-configs.sh
+echo "demo" | sudo -S asterisk -rx "module unload chan_mobile.so"
+echo "demo" | sudo -S asterisk -rx "module load chan_mobile.so"
 ```
 
-### 13e. Provision HT801 phones with SIP password
+> **Note:** chan_mobile does not support `core reload` — you must unload/load the module.
+
+### 13f. Provision HT801 phones
 
 ```bash
 bash scripts/ht801-provision.sh 192.168.10.138 101 pbxpass2024
@@ -171,14 +206,18 @@ bash scripts/ht801-provision.sh 192.168.10.194 102 pbxpass2024
 bash scripts/ht801-provision.sh 192.168.10.100 103 pbxpass2024
 ```
 
-### 13f. Verify
+> **Note:** The HT801 v2 API silently ignores writes to P34 (SIP auth password).
+> The pjsip.conf uses no auth since the phones are on a trusted LAN.
+
+### 13g. Verify
 
 ```bash
-sudo asterisk -rx "pjsip show contacts"    # All 3 extensions registered
-sudo asterisk -rx "mobile show devices"     # Android phone connected
+echo "demo" | sudo -S asterisk -rx "pjsip show contacts"    # All 3 extensions registered
+echo "demo" | sudo -S asterisk -rx "mobile show devices"     # Android: Connected=Yes, State=Free
 ```
 
 Test calls:
+- **Echo test:** Dial `*43` from any phone — hear your voice echoed back
 - **Internal:** Dial ext 101 → 102
 - **Incoming cellular:** Call the Android phone number → all 3 phones ring
 - **Outgoing cellular:** Pick up any phone, dial a number → goes through Android
@@ -190,6 +229,12 @@ Test calls:
 - **Asterisk not in Debian Trixie repos:** Must build from source. The `asterisk-setup.sh` script handles this end-to-end.
 - **PipeWire steals Bluetooth audio:** PipeWire's WirePlumber claims HFP/HSP profiles on the BT adapter, preventing Asterisk's `chan_mobile` from getting SCO audio. The WirePlumber override in `configs/wireplumber/90-disable-bluetooth.conf` disables this. Must be applied before starting Asterisk.
 - **Asterisk must run as root:** Required for Bluetooth SCO socket access. Configured in `configs/asterisk/asterisk.conf` (`runuser = root`).
+- **Broadcom dongle firmware:** The Belkin Broadcom 4.0 USB dongle (050d:065a) needs `BCM20702A1-050d-065a.hcd` which is NOT in the `bluez-firmware` package. Must be downloaded from [winterheart/broadcom-bt-firmware](https://github.com/winterheart/broadcom-bt-firmware) to `/lib/firmware/brcm/`. After placing the firmware, reload btusb (`sudo rmmod btusb && sudo modprobe btusb`) to apply it. This may change the adapter from `hci0` to `hci1`.
+- **BlueZ SDP server:** chan_mobile requires the SDP server which BlueZ 5 disables by default. Must add `--compat` flag to bluetoothd. On MX Linux (sysvinit), edit `/etc/init.d/bluetooth` and restart.
+- **chan_mobile adapter reference:** The `adapter` field in the phone section must match the adapter's `id` value (e.g., `hci1`), NOT the config section name. The source code at `chan_mobile.c:4499` compares `adapter->id` (the `id` field) with the phone's `adapter` setting.
+- **Bluetooth pairing direction:** Pairing MUST be initiated from the Android phone, not from the PBX. When initiated from the PBX via `bluetoothctl pair`, the link keys are not stored (bonding fails silently). Make the PBX discoverable with `bluetoothctl discoverable on` and pair from Android Settings.
+- **HT801 v2 SIP password (P34):** The Grandstream HT801 v2 config API silently ignores writes to P34 (auth password). The API returns success but the value is not persisted. Workaround: use no SIP auth in pjsip.conf (acceptable on trusted LAN).
+- **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
 
 ## Notes
 
