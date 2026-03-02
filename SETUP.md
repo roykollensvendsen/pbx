@@ -137,7 +137,7 @@ This runs 8 steps automatically:
 3. Downloads Broadcom BCM20702A1 dongle firmware (not in bluez-firmware) and reloads btusb
 4. Enables BlueZ SDP server (`--compat` mode in `/etc/init.d/bluetooth`)
 5. Installs Asterisk build dependencies
-6. Downloads and builds Asterisk 22 LTS from source with `chan_mobile`
+6. Downloads and builds Asterisk 22 LTS from source with `chan_mobile` (applies patches from `patches/`)
 7. Opens UFW firewall ports (SIP 5060, RTP 10000-20000)
 8. Deploys Asterisk configs and starts Asterisk
 
@@ -314,6 +314,7 @@ npm run agent:echo
 - **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
 - **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features.
 - **HT801 v2 P290 and `+` encoding:** The `+` character in P290 (Dial Plan) values is silently converted to a space because the config API uses `application/x-www-form-urlencoded`. Use `x.` instead of `x+` in dial plan patterns.
+- **chan_mobile CIEV race on back-to-back calls:** When a new incoming call arrives immediately after a previous call ends, the Android phone sends `callsetup=incoming` (new call) followed by a lagging `call=0` (old call done). chan_mobile interprets `call=0` as the *new* call being disconnected, causing the caller to go straight to the Android handset. Fixed by `patches/chan_mobile-ciev-call-race.patch`, which ignores `call=0` during incoming call setup (before the channel is created). The patch is applied automatically during `asterisk-build.sh`.
 
 ## Notes
 
