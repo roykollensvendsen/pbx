@@ -28,11 +28,12 @@ function handleConnection(socket) {
   function readCallerID() {
     try {
       const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
-      fs.unlinkSync('/tmp/agent-callerid');
       const [num, name] = raw.split('|');
       callerNumber = num || null;
       callerName = (name && name !== callerNumber) ? name : null;
       console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'})`);
+      // Remove file (may fail if owned by root — that's OK)
+      try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
       return true;
     } catch (e) {
       return false;
