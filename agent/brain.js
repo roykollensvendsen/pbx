@@ -70,6 +70,7 @@ async function fetchWeather() {
     // Tvedestrand: 58.6167°N, 8.9333°E
     const res = await fetch('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=58.6167&lon=8.9333', {
       headers: { 'User-Agent': 'pbx-phone-agent github.com/roykollensvendsen/pbx' },
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
