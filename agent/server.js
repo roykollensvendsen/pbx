@@ -21,10 +21,55 @@ function handleConnection(socket) {
   let pendingTranscript = '';
   let destroyed = false;
 
+  // Audio playback queue with real-time pacing (20ms per frame)
+  let playbackQueue = [];
+  let playbackTimer = null;
+
+  function startPlayback() {
+    if (playbackTimer) return;
+    playbackTimer = setInterval(() => {
+      if (playbackQueue.length === 0) {
+        clearInterval(playbackTimer);
+        playbackTimer = null;
+        return;
+      }
+      const frame = playbackQueue.shift();
+      if (!socket.destroyed) {
+        socket.write(encodeAudio(frame));
+      }
+    }, 20);
+  }
+
+  function queueAudio(pcmChunk) {
+    // Split into 320-byte frames (20ms at 8kHz 16-bit mono)
+    let offset = 0;
+    while (offset < pcmChunk.length) {
+      const end = Math.min(offset + 320, pcmChunk.length);
+      let frame = pcmChunk.subarray(offset, end);
+      if (frame.length < 320) {
+        const padded = Buffer.alloc(320, 0);
+        frame.copy(padded);
+        frame = padded;
+      }
+      playbackQueue.push(frame);
+      offset = end;
+    }
+    startPlayback();
+  }
+
+  function stopPlayback() {
+    playbackQueue = [];
+    if (playbackTimer) {
+      clearInterval(playbackTimer);
+      playbackTimer = null;
+    }
+  }
+
   function cleanup() {
     if (destroyed) return;
     destroyed = true;
     console.log(`[Server] Cleaning up ${uuid || remoteAddr}`);
+    stopPlayback();
     if (stt) stt.stop();
     if (tts) tts.abort();
   }
@@ -79,13 +124,6 @@ function handleConnection(socket) {
       }
     } else {
       console.log(`[STT] Interim: "${text}"`);
-
-      // Barge-in: if user speaks while TTS is playing, stop TTS
-      if (ttsPlaying && text.length > 3) {
-        console.log('[Server] Barge-in detected, stopping TTS');
-        if (tts) tts.abort();
-        ttsPlaying = false;
-      }
     }
   });
 
@@ -128,32 +166,33 @@ function handleConnection(socket) {
 
       tts.on('audio', (pcmChunk) => {
         if (destroyed || socket.destroyed) return;
-        // Send audio in 320-byte frames (20ms at 8kHz 16-bit mono)
-        let offset = 0;
-        while (offset < pcmChunk.length) {
-          const end = Math.min(offset + 320, pcmChunk.length);
-          let frame = pcmChunk.subarray(offset, end);
-          // Pad last frame if needed
-          if (frame.length < 320) {
-            const padded = Buffer.alloc(320, 0);
-            frame.copy(padded);
-            frame = padded;
-          }
-          socket.write(encodeAudio(frame));
-          offset = end;
-        }
-      });
-
-      tts.on('done', () => {
-        ttsPlaying = false;
+        queueAudio(pcmChunk);
       });
 
       tts.on('error', () => {
         ttsPlaying = false;
+        stopPlayback();
         resolve();
       });
 
-      tts.speak(sentence).then(resolve).catch(() => resolve());
+      // When TTS WebSocket closes, wait for playback queue to drain
+      tts.speak(sentence).then(() => {
+        if (playbackQueue.length === 0) {
+          ttsPlaying = false;
+          return resolve();
+        }
+        // Poll until queue is drained
+        const waitDrain = setInterval(() => {
+          if (playbackQueue.length === 0 || destroyed) {
+            clearInterval(waitDrain);
+            ttsPlaying = false;
+            resolve();
+          }
+        }, 50);
+      }).catch(() => {
+        ttsPlaying = false;
+        resolve();
+      });
     });
   }
 
@@ -189,8 +228,10 @@ function handleConnection(socket) {
         uuid = formatUUID(frame.payload);
         console.log(`[Server] UUID: ${uuid}`);
       } else if (frame.type === TYPE_AUDIO) {
-        // Forward audio to STT
-        stt.send(frame.payload);
+        // Don't send audio to STT while TTS is playing (prevents self-hearing)
+        if (!ttsPlaying) {
+          stt.send(frame.payload);
+        }
       } else if (frame.type === TYPE_TERMINATE) {
         console.log('[Server] Received terminate — caller hung up');
         cleanup();

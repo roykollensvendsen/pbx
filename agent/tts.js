@@ -30,11 +30,13 @@ class ElevenLabsTTS extends EventEmitter {
       });
 
       const url = `${ELEVENLABS_WS_URL}/${voiceId}/stream-input?${params}`;
+      console.log(`[TTS] Connecting to ElevenLabs (voice: ${voiceId}, model: ${model})`);
       this.ws = new WebSocket(url);
       this.aborted = false;
 
       this.ws.on('open', () => {
         this.ready = true;
+        console.log('[TTS] WebSocket connected, sending text');
         // Send BOS (beginning of stream) with voice settings
         this.ws.send(JSON.stringify({
           text: ' ',
@@ -56,14 +58,18 @@ class ElevenLabsTTS extends EventEmitter {
         if (this.aborted) return;
         try {
           const msg = JSON.parse(data);
+          if (msg.error) {
+            console.error('[TTS] API error:', msg.error, msg.message || '');
+            return;
+          }
           if (msg.audio) {
-            // Decode base64 PCM audio
             const pcm = Buffer.from(msg.audio, 'base64');
-            // Resample from TTS rate to 8kHz
+            console.log(`[TTS] Audio chunk: ${pcm.length} bytes`);
             const resampled = resample(pcm, TTS_SAMPLE_RATE, TARGET_SAMPLE_RATE);
             this.emit('audio', resampled);
           }
           if (msg.isFinal) {
+            console.log('[TTS] Stream complete');
             this.emit('done');
           }
         } catch (err) {
@@ -77,7 +83,8 @@ class ElevenLabsTTS extends EventEmitter {
         reject(err);
       });
 
-      this.ws.on('close', () => {
+      this.ws.on('close', (code, reason) => {
+        console.log(`[TTS] WebSocket closed: ${code} ${reason}`);
         this.ready = false;
         this.ws = null;
         resolve();
