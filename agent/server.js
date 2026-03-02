@@ -25,17 +25,22 @@ function handleConnection(socket) {
   let callerNumber = null;
   let callerName = null;
 
-  // Read caller ID written by Asterisk dialplan (format: "number|name")
-  try {
-    const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
-    fs.unlinkSync('/tmp/agent-callerid');
-    const [num, name] = raw.split('|');
-    callerNumber = num || null;
-    callerName = (name && name !== callerNumber) ? name : null;
-    console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'})`);
-  } catch (e) {
-    // No caller ID file — direct dial to 104
+  function readCallerID() {
+    try {
+      const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
+      fs.unlinkSync('/tmp/agent-callerid');
+      const [num, name] = raw.split('|');
+      callerNumber = num || null;
+      callerName = (name && name !== callerNumber) ? name : null;
+      console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'})`);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
+
+  // Try reading caller ID — retry a few times since Asterisk writes it just before Dial()
+  readCallerID();
 
   // Audio playback queue with real-time pacing (20ms per frame)
   let playbackQueue = [];
@@ -129,7 +134,6 @@ function handleConnection(socket) {
 
   // --- Full AI pipeline ---
   stt = new DeepgramSTT();
-  brain = new Brain(callerNumber, callerName);
 
   // Buffer for accumulating final transcripts into a complete utterance
   let utteranceText = '';
@@ -230,15 +234,18 @@ function handleConnection(socket) {
   // Send initial greeting after a short delay
   stt.on('ready', () => {
     console.log('[Server] Pipeline ready, sending greeting');
-    // Small delay to let the call settle
+    // Delay to let caller ID file be written and call settle
     setTimeout(async () => {
       if (destroyed) return;
+      // Re-read caller ID in case it wasn't available at connect time
+      if (!callerNumber) readCallerID();
+      // Now create Brain with caller info
+      brain = new Brain(callerNumber, callerName);
       processing = true;
       const greeting = callerName
         ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?`
         : 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?';
       console.log(`[Brain] Greeting: "${greeting}"`);
-      // Add to conversation history so Claude knows the context
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
       processing = false;
