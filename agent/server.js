@@ -245,8 +245,8 @@ function handleConnection(socket) {
       await brain.init();
       processing = true;
       const greeting = callerName
-        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, eller svare på spørsmål om klokka og været.`
-        : 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, eller svare på spørsmål om klokka og været.';
+        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været, eller fortelle en vits.`
+        : 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været, eller fortelle en vits.';
       console.log(`[Brain] Greeting: "${greeting}"`);
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
