@@ -240,8 +240,9 @@ function handleConnection(socket) {
       if (destroyed) return;
       // Re-read caller ID in case it wasn't available at connect time
       if (!callerNumber) readCallerID();
-      // Now create Brain with caller info
+      // Now create Brain with caller info (init fetches time/weather)
       brain = new Brain(callerNumber, callerName);
+      await brain.init();
       processing = true;
       const greeting = callerName
         ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?`

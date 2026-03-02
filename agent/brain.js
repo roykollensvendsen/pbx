@@ -15,8 +15,36 @@ Viktige regler:
 - Vær høflig og vennlig, men effektiv
 - Ikke bruk markdown, emojis, eller spesialtegn — dette leses opp som tale
 - Unngå lange pauser i setningene
+- Du kan svare på spørsmål om klokka og været
 
 Eksempel på åpning: "Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?"`;
+
+const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
+const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+
+function formatNorwegianTime() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Oslo' }));
+  const day = WEEKDAYS[now.getDay()];
+  const date = now.getDate();
+  const month = MONTHS[now.getMonth()];
+  const year = now.getFullYear();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${day} ${date}. ${month} ${year}, klokka ${hours}:${minutes}`;
+}
+
+async function fetchWeather() {
+  try {
+    const res = await fetch('https://wttr.in/Tvedestrand?format=3&lang=no');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = (await res.text()).trim();
+    console.log(`[Brain] Weather: ${text}`);
+    return text;
+  } catch (err) {
+    console.error(`[Brain] Failed to fetch weather: ${err.message}`);
+    return null;
+  }
+}
 
 class Brain {
   constructor(callerNumber, callerName) {
@@ -28,6 +56,16 @@ class Brain {
       if (callerName) parts.push(`Navn: ${callerName}`);
       if (callerNumber) parts.push(`Nummer: ${callerNumber}`);
       this.systemPrompt += `\n\nInformasjon om innringeren:\n${parts.join('\n')}\n\nDu trenger ikke spørre om navn eller nummer hvis du allerede har det. Bruk navnet naturlig i samtalen.`;
+    }
+  }
+
+  async init() {
+    const time = formatNorwegianTime();
+    this.systemPrompt += `\n\nNåværende tidspunkt: ${time}`;
+
+    const weather = await fetchWeather();
+    if (weather) {
+      this.systemPrompt += `\nVæret akkurat nå: ${weather}`;
     }
   }
 
