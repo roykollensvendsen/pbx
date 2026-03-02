@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendCallSummary(messages, callerNumber) {
+async function sendCallSummary(messages, callerNumber, callerName) {
   if (!config.NOTIFY_EMAIL) {
     console.log('[Notify] No email configured, skipping notification');
     return;
@@ -25,7 +25,13 @@ async function sendCallSummary(messages, callerNumber) {
 
   const body = lines.join('\n\n');
   const time = new Date().toLocaleString('no-NO', { timeZone: 'Europe/Oslo' });
-  const callerInfo = callerNumber ? ` fra ${callerNumber}` : '';
+
+  let callerInfo = '';
+  if (callerName && callerNumber) {
+    callerInfo = ` fra ${callerName} (${callerNumber})`;
+  } else if (callerNumber) {
+    callerInfo = ` fra ${callerNumber}`;
+  }
 
   try {
     await transporter.sendMail({

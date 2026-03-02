@@ -23,12 +23,16 @@ function handleConnection(socket) {
   let pendingTranscript = '';
   let destroyed = false;
   let callerNumber = null;
+  let callerName = null;
 
-  // Read caller ID written by Asterisk dialplan
+  // Read caller ID written by Asterisk dialplan (format: "number|name")
   try {
-    callerNumber = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
+    const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
     fs.unlinkSync('/tmp/agent-callerid');
-    if (callerNumber) console.log(`[Server] Caller ID: ${callerNumber}`);
+    const [num, name] = raw.split('|');
+    callerNumber = num || null;
+    callerName = (name && name !== callerNumber) ? name : null;
+    console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'})`);
   } catch (e) {
     // No caller ID file — direct dial to 104
   }
@@ -87,7 +91,7 @@ function handleConnection(socket) {
     if (tts) tts.abort();
     // Send email notification if there was a conversation
     if (brain && brain.messages.length > 1) {
-      sendCallSummary(brain.messages, callerNumber);
+      sendCallSummary(brain.messages, callerNumber, callerName);
     }
   }
 
