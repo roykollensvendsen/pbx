@@ -219,15 +219,13 @@ echo "demo" | sudo -S asterisk -rx "mobile show devices"     # Android: Connecte
 Test calls:
 - **Echo test:** Dial `*43` from any phone — hear your voice echoed back
 - **Internal:** Dial ext 101 → 102
-- **Incoming cellular:** Call the Android phone number → all 3 phones ring, voicemail after 25s if no answer
+- **Incoming cellular:** Call the Android phone number → all 3 phones ring 15s, then AI agent answers
 - **Outgoing cellular:** Pick up any phone, dial a number → goes through Android
-- **Voicemail check:** Dial `100` from any phone, enter PIN `1234`
 
 ### Available extensions
 
 | Extension | Purpose |
 |-----------|---------|
-| 100 | Check voicemail (PIN: 1234) |
 | 101 | Phone 1 (192.168.10.138) |
 | 102 | Phone 2 (192.168.10.194) |
 | 103 | Phone 3 (192.168.10.100) |
@@ -280,7 +278,6 @@ npm run agent:echo
 
 | Extension | Purpose |
 |-----------|---------|
-| 100 | Check voicemail (PIN: 1234) |
 | 101 | Phone 1 (192.168.10.138) |
 | 102 | Phone 2 (192.168.10.194) |
 | 103 | Phone 3 (192.168.10.100) |
@@ -300,7 +297,7 @@ npm run agent:echo
 - **Bluetooth pairing direction:** Pairing MUST be initiated from the Android phone, not from the PBX. When initiated from the PBX via `bluetoothctl pair`, the link keys are not stored (bonding fails silently). Make the PBX discoverable with `bluetoothctl discoverable on` and pair from Android Settings.
 - **HT801 v2 SIP password (P34):** The Grandstream HT801 v2 config API silently ignores writes to P34 (auth password). The API returns success but the value is not persisted. Workaround: use no SIP auth in pjsip.conf (acceptable on trusted LAN).
 - **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
-- **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features (e.g., `100` for voicemail check).
+- **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features.
 - **HT801 v2 P290 and `+` encoding:** The `+` character in P290 (Dial Plan) values is silently converted to a space because the config API uses `application/x-www-form-urlencoded`. Use `x.` instead of `x+` in dial plan patterns.
 
 ## Notes

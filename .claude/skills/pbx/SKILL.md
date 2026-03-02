@@ -175,10 +175,9 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 - **Bluetooth adapter:** Belkin Broadcom 4.0 (050d:065a, BD 5C:F3:70:85:9C:08)
 - **Android phone:** Roy sin XCover7 Pro (E4:9F:7D:2F:A7:2D, RFCOMM port 4)
 - **SIP auth:** None (HT801 v2 API cannot write P34 passwords; trusted LAN)
-- **Incoming cellular:** rings all 3 phones 15s, then AI agent via AudioSocket, then voicemail
+- **Incoming cellular:** rings all 3 phones 15s, then AI agent via AudioSocket
 - **Outgoing cellular:** any phone dials through Android via `Mobile/android/${EXTEN}`
 - **Echo test:** `*43` from any phone (note: star codes unreliable on HT801 keypads)
-- **Voicemail check:** dial `100` from any phone, PIN `1234`
 - **Config files:** `configs/asterisk/` → deployed to `/etc/asterisk/`
 - **Build scripts:** `scripts/asterisk-*.sh` for install/build/deploy
 - **Master setup:** `scripts/asterisk-setup.sh` runs all automated steps
@@ -188,7 +187,6 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 
 | Extension | Purpose | HT801 compatible |
 |-----------|---------|-----------------|
-| 100 | Check voicemail (PIN: 1234) | Yes |
 | 101 | Phone 1 (192.168.10.138) | Yes |
 | 102 | Phone 2 (192.168.10.194) | Yes |
 | 103 | Phone 3 (192.168.10.100) | Yes |
@@ -205,15 +203,13 @@ Cellular → Android Phone → [Bluetooth HFP] → Belkin BT Dongle → Asterisk
 3. **If answered:** call connects to answering phone
 4. **If not answered in 15s:** AI agent picks up via AudioSocket (Node.js server on port 9092)
 5. AI greets caller in Norwegian, has conversation via STT → Claude → TTS pipeline
-6. If AI agent server is not running, falls through to voicemail
+6. After call ends, email summary is sent to configured address
 
 ### Config files involved
 
 | File | Purpose |
 |------|---------|
-| `extensions.conf` | Dialplan: `[internal]`, `[incoming-mobile]`, `[conf-mobile-join]`, `[mobile-vm-watchdog]` |
-| `confbridge.conf` | Conference profiles: `[mobile-bridge]`, `[mobile-caller]` (marked), `[mobile-phone]` (unmarked) |
-| `voicemail.conf` | Mailbox 100 in `[default]` context, PIN 1234 |
+| `extensions.conf` | Dialplan: `[internal]`, `[incoming-mobile]` |
 | `pjsip.conf` | SIP endpoints 101/102/103 (no auth, trusted LAN) |
 | `chan_mobile.conf` | Bluetooth adapter + Android phone config |
 
