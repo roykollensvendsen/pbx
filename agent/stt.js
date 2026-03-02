@@ -65,7 +65,7 @@ class DeepgramSTT extends EventEmitter {
     this.ws.on('close', (code, reason) => {
       this.ready = false;
       console.log(`[STT] Closed: ${code} ${reason}`);
-      if (code !== 1000 && code !== 1001) {
+      if (code !== 1000 && code !== 1001 && code !== 1005) {
         sendApiAlert('Deepgram STT', `WebSocket closed unexpectedly: ${code} ${reason}`);
       }
       this.emit('close');
