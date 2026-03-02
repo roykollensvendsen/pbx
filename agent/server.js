@@ -6,6 +6,7 @@ const { parseFrame, encodeAudio, encodeTerminate, formatUUID, TYPE_UUID, TYPE_AU
 const { DeepgramSTT } = require('./stt');
 const { Brain } = require('./brain');
 const { ElevenLabsTTS } = require('./tts');
+const { sendCallSummary } = require('./notify');
 
 function handleConnection(socket) {
   const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
@@ -72,6 +73,10 @@ function handleConnection(socket) {
     stopPlayback();
     if (stt) stt.stop();
     if (tts) tts.abort();
+    // Send email notification if there was a conversation
+    if (brain && brain.messages.length > 1) {
+      sendCallSummary(brain.messages);
+    }
   }
 
   // --- Echo mode ---

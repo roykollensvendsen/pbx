@@ -28,4 +28,6 @@ module.exports = {
   AGENT_LANGUAGE: process.env.AGENT_LANGUAGE || 'no',
   ELEVENLABS_MODEL: process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
   ECHO_MODE: !!process.env.ECHO_MODE,
+  NOTIFY_EMAIL: process.env.NOTIFY_EMAIL || '',
+  NOTIFY_EMAIL_PASSWORD: process.env.NOTIFY_EMAIL_PASSWORD || '',
 };
