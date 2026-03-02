@@ -2,6 +2,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
+const { sendApiAlert } = require('./notify');
 
 const SYSTEM_PROMPT = `Du er en hyggelig og profesjonell AI-resepsjonist som svarer telefonen for Roy.
 
@@ -118,21 +119,27 @@ class Brain {
 
     let fullResponse = '';
 
-    const stream = this.client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      system: this.systemPrompt,
-      messages: this.messages,
-    });
+    try {
+      const stream = this.client.messages.stream({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        system: this.systemPrompt,
+        messages: this.messages,
+      });
 
-    const chunks = [];
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta?.text) {
-        chunks.push(event.delta.text);
+      const chunks = [];
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta?.text) {
+          chunks.push(event.delta.text);
+        }
       }
+
+      fullResponse = chunks.join('');
+    } catch (err) {
+      sendApiAlert('Anthropic Claude', err);
+      throw err;
     }
 
-    fullResponse = chunks.join('');
     this.messages.push({ role: 'assistant', content: fullResponse });
 
     return fullResponse;
@@ -141,28 +148,33 @@ class Brain {
   async *respondStreaming(userText) {
     this.messages.push({ role: 'user', content: userText });
 
-    const stream = this.client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      system: this.systemPrompt,
-      messages: this.messages,
-    });
-
     let fullResponse = '';
     let sentenceBuffer = '';
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta?.text) {
-        sentenceBuffer += event.delta.text;
-        fullResponse += event.delta.text;
+    try {
+      const stream = this.client.messages.stream({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        system: this.systemPrompt,
+        messages: this.messages,
+      });
 
-        // Yield complete sentences for TTS (split on sentence-ending punctuation)
-        const sentenceMatch = sentenceBuffer.match(/^(.*?[.!?]+)\s*(.*)/s);
-        if (sentenceMatch) {
-          yield sentenceMatch[1].trim();
-          sentenceBuffer = sentenceMatch[2];
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta?.text) {
+          sentenceBuffer += event.delta.text;
+          fullResponse += event.delta.text;
+
+          // Yield complete sentences for TTS (split on sentence-ending punctuation)
+          const sentenceMatch = sentenceBuffer.match(/^(.*?[.!?]+)\s*(.*)/s);
+          if (sentenceMatch) {
+            yield sentenceMatch[1].trim();
+            sentenceBuffer = sentenceMatch[2];
+          }
         }
       }
+    } catch (err) {
+      sendApiAlert('Anthropic Claude', err);
+      throw err;
     }
 
     // Yield any remaining text

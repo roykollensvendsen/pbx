@@ -3,6 +3,7 @@
 const { EventEmitter } = require('events');
 const WebSocket = require('ws');
 const config = require('./config');
+const { sendApiAlert } = require('./notify');
 
 class DeepgramSTT extends EventEmitter {
   constructor() {
@@ -57,12 +58,16 @@ class DeepgramSTT extends EventEmitter {
 
     this.ws.on('error', (err) => {
       console.error('[STT] WebSocket error:', err.message);
+      sendApiAlert('Deepgram STT', err);
       this.emit('error', err);
     });
 
     this.ws.on('close', (code, reason) => {
       this.ready = false;
       console.log(`[STT] Closed: ${code} ${reason}`);
+      if (code !== 1000 && code !== 1001) {
+        sendApiAlert('Deepgram STT', `WebSocket closed unexpectedly: ${code} ${reason}`);
+      }
       this.emit('close');
     });
   }

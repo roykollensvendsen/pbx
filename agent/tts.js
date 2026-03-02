@@ -4,6 +4,7 @@ const { EventEmitter } = require('events');
 const WebSocket = require('ws');
 const config = require('./config');
 const { resample } = require('./resampler');
+const { sendApiAlert } = require('./notify');
 
 const ELEVENLABS_WS_URL = 'wss://api.elevenlabs.io/v1/text-to-speech';
 // ElevenLabs PCM output sample rate
@@ -60,6 +61,7 @@ class ElevenLabsTTS extends EventEmitter {
           const msg = JSON.parse(data);
           if (msg.error) {
             console.error('[TTS] API error:', msg.error, msg.message || '');
+            sendApiAlert('ElevenLabs TTS', `${msg.error}: ${msg.message || ''}`);
             return;
           }
           if (msg.audio) {
@@ -79,6 +81,7 @@ class ElevenLabsTTS extends EventEmitter {
 
       this.ws.on('error', (err) => {
         console.error('[TTS] WebSocket error:', err.message);
+        sendApiAlert('ElevenLabs TTS', err);
         this.emit('error', err);
         reject(err);
       });

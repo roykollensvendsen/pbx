@@ -11,6 +11,37 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Rate limiting: track last alert time per service
+const alertCooldowns = new Map();
+const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+async function sendApiAlert(service, error) {
+  if (!config.NOTIFY_EMAIL) return;
+
+  const now = Date.now();
+  const lastSent = alertCooldowns.get(service) || 0;
+  if (now - lastSent < ALERT_COOLDOWN_MS) {
+    console.log(`[Notify] Alert for ${service} suppressed (cooldown)`);
+    return;
+  }
+  alertCooldowns.set(service, now);
+
+  const time = new Date().toLocaleString('no-NO', { timeZone: 'Europe/Oslo' });
+  const errMsg = error instanceof Error ? error.message : String(error);
+
+  try {
+    await transporter.sendMail({
+      from: config.NOTIFY_EMAIL,
+      to: config.NOTIFY_EMAIL,
+      subject: `API-feil: ${service} – ${time}`,
+      text: `API-feil i ${service} oppdaget ${time}.\n\nFeilmelding:\n${errMsg}`,
+    });
+    console.log(`[Notify] API alert sent for ${service}`);
+  } catch (err) {
+    console.error('[Notify] API alert email failed:', err.message);
+  }
+}
+
 async function sendCallSummary(messages, callerNumber, callerName) {
   if (!config.NOTIFY_EMAIL) {
     console.log('[Notify] No email configured, skipping notification');
@@ -46,4 +77,4 @@ async function sendCallSummary(messages, callerNumber, callerName) {
   }
 }
 
-module.exports = { sendCallSummary };
+module.exports = { sendCallSummary, sendApiAlert };

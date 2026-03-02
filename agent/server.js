@@ -7,7 +7,7 @@ const { parseFrame, encodeAudio, encodeTerminate, formatUUID, TYPE_UUID, TYPE_AU
 const { DeepgramSTT } = require('./stt');
 const { Brain } = require('./brain');
 const { ElevenLabsTTS } = require('./tts');
-const { sendCallSummary } = require('./notify');
+const { sendCallSummary, sendApiAlert } = require('./notify');
 
 function handleConnection(socket) {
   const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
@@ -286,6 +286,7 @@ function handleConnection(socket) {
 
   socket.on('error', (err) => {
     console.error(`[Server] Socket error: ${err.message}`);
+    sendApiAlert('AudioSocket', err);
     cleanup();
   });
 }
