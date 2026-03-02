@@ -70,6 +70,7 @@ function handleConnection(socket) {
     if (destroyed) return;
     destroyed = true;
     console.log(`[Server] Cleaning up ${uuid || remoteAddr}`);
+    if (keepAliveTimer) clearInterval(keepAliveTimer);
     stopPlayback();
     if (stt) stt.stop();
     if (tts) tts.abort();
@@ -200,6 +201,13 @@ function handleConnection(socket) {
       });
     });
   }
+
+  // Send silence frames to keep AudioSocket alive (Asterisk times out after 2s of no activity)
+  const keepAliveTimer = setInterval(() => {
+    if (!destroyed && !socket.destroyed && !ttsPlaying) {
+      socket.write(encodeAudio(SILENCE_FRAME));
+    }
+  }, 200);
 
   // Start STT
   stt.start();
