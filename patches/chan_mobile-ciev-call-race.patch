@@ -1,0 +1,18 @@
+--- a/addons/chan_mobile.c
++++ b/addons/chan_mobile.c
+@@ -3565,6 +3565,14 @@ static int handle_response_ciev(struct mbl_pvt *pvt, char *buf)
+ 	case HFP_CIND_CALL:
+ 		switch (i) {
+ 		case HFP_CIND_CALL_NONE:
++			if (pvt->incoming && !pvt->owner) {
++				/* During incoming call setup (waiting for CLIP), call=0 is
++				 * expected — there is no active call yet. A lagging call=0
++				 * from the previous call must not kill the new incoming
++				 * call setup. Cleanup will happen via callsetup=0 if the
++				 * call is actually rejected. */
++				ast_debug(1, "[%s] call=0 during incoming callsetup, ignoring\n", pvt->id);
++				break;
++			}
+ 			ast_debug(1, "[%s] line disconnected\n", pvt->id);
+ 			if (pvt->owner) {
+ 				ast_debug(1, "[%s] hanging up owner\n", pvt->id);

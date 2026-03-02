@@ -10,8 +10,24 @@ if [ -z "$ASTERISK_DIR" ]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "=== Building Asterisk from $ASTERISK_DIR ==="
 cd "$ASTERISK_DIR"
+
+# Apply patches
+if [ -d "$PROJECT_DIR/patches" ]; then
+  for patch in "$PROJECT_DIR/patches"/*.patch; do
+    [ -f "$patch" ] || continue
+    if patch -p1 --forward --dry-run < "$patch" >/dev/null 2>&1; then
+      echo "Applying patch: $(basename "$patch")"
+      patch -p1 --forward < "$patch"
+    else
+      echo "Patch already applied or N/A: $(basename "$patch")"
+    fi
+  done
+fi
 
 # Configure with Bluetooth support
 echo "Running ./configure --with-bluetooth..."
