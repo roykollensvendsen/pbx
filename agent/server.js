@@ -95,8 +95,8 @@ function handleConnection(socket) {
     stopPlayback();
     if (stt) stt.stop();
     if (tts) tts.abort();
-    // Send email notification if there was a conversation
-    if (brain && brain.messages.length > 1) {
+    // Send email notification if agent answered (even if caller said nothing)
+    if (brain && brain.messages.length > 0) {
       sendCallSummary(brain.messages, callerNumber, callerName);
     }
   }
