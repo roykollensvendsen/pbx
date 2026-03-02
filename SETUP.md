@@ -312,12 +312,13 @@ generating false transcriptions (barge-in prevention).
 
 ### 14d. Caller ID file
 
-Asterisk writes caller info to `/tmp/agent-callerid` before connecting to AudioSocket.
-The agent reads this file to greet the caller by name.
+Asterisk writes caller info to `/tmp/agent-callerid` (with `chmod 666`) in the `incoming-mobile`
+context before dialing the agent. The agent reads this file to greet the caller by name and
+include caller info in the email notification.
 
-- Asterisk runs as root, so the file is owned by root
-- `/tmp` has the sticky bit, so the `demo` user cannot delete root-owned files
-- The dialplan for extension 104 runs `rm -f /tmp/agent-callerid` (as root) to clean up stale files before writing a new one
+- The file is written by Asterisk (root) with `chmod 666` so the agent (demo) can read it
+- The `incoming-mobile` context uses `>` redirect which overwrites any existing file — no cleanup needed
+- Do NOT add `rm -f` to extension 104 — this would delete the file before the agent reads it
 
 ### 14e. Install dependencies
 
@@ -383,7 +384,7 @@ This starts both the AI agent and the chan_mobile watchdog. Output is logged to 
 - **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
 - **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features.
 - **HT801 v2 P290 and `+` encoding:** The `+` character in P290 (Dial Plan) values is silently converted to a space because the config API uses `application/x-www-form-urlencoded`. Use `x.` instead of `x+` in dial plan patterns.
-- **`/tmp/agent-callerid` owned by root:** Asterisk (running as root) writes this file, but the agent runs as `demo`. The `/tmp` sticky bit prevents `demo` from deleting root-owned files. Solved by having the extension 104 dialplan run `rm -f /tmp/agent-callerid` (executes as root) before writing a new one.
+- **`/tmp/agent-callerid` must not be deleted in extension 104:** The `incoming-mobile` context writes this file before dialing the agent. Do NOT `rm -f` it in extension 104 — this deletes the file before the agent reads it, causing missing caller ID in email notifications. The file is overwritten by `>` redirect each time, so no cleanup is needed.
 - **API failure email alerts:** The agent sends email alerts when Deepgram, Anthropic, or ElevenLabs APIs fail (e.g. expired keys, quota exceeded). Rate limited to 1 email per service per 5 minutes. Requires `NOTIFY_EMAIL` and `NOTIFY_EMAIL_PASSWORD` in `.env`.
 - **chan_mobile CIEV race on back-to-back calls:** When a new incoming call arrives immediately after a previous call ends, the Android phone sends `callsetup=incoming` (new call) followed by a lagging `call=0` (old call done). chan_mobile interprets `call=0` as the *new* call being disconnected, causing the caller to go straight to the Android handset. Fixed by `patches/chan_mobile-ciev-call-race.patch`, which ignores `call=0` during incoming call setup (before the channel is created). The patch is applied automatically during `asterisk-build.sh`.
 
