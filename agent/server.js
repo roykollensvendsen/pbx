@@ -1,6 +1,7 @@
 'use strict';
 
 const net = require('net');
+const fs = require('fs');
 const config = require('./config');
 const { parseFrame, encodeAudio, encodeTerminate, formatUUID, TYPE_UUID, TYPE_AUDIO, TYPE_TERMINATE, SILENCE_FRAME } = require('./audiosocket');
 const { DeepgramSTT } = require('./stt');
@@ -21,6 +22,16 @@ function handleConnection(socket) {
   let ttsPlaying = false;
   let pendingTranscript = '';
   let destroyed = false;
+  let callerNumber = null;
+
+  // Read caller ID written by Asterisk dialplan
+  try {
+    callerNumber = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
+    fs.unlinkSync('/tmp/agent-callerid');
+    if (callerNumber) console.log(`[Server] Caller ID: ${callerNumber}`);
+  } catch (e) {
+    // No caller ID file — direct dial to 104
+  }
 
   // Audio playback queue with real-time pacing (20ms per frame)
   let playbackQueue = [];
@@ -76,7 +87,7 @@ function handleConnection(socket) {
     if (tts) tts.abort();
     // Send email notification if there was a conversation
     if (brain && brain.messages.length > 1) {
-      sendCallSummary(brain.messages);
+      sendCallSummary(brain.messages, callerNumber);
     }
   }
 

@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendCallSummary(messages) {
+async function sendCallSummary(messages, callerNumber) {
   if (!config.NOTIFY_EMAIL) {
     console.log('[Notify] No email configured, skipping notification');
     return;
@@ -25,13 +25,14 @@ async function sendCallSummary(messages) {
 
   const body = lines.join('\n\n');
   const time = new Date().toLocaleString('no-NO', { timeZone: 'Europe/Oslo' });
+  const callerInfo = callerNumber ? ` fra ${callerNumber}` : '';
 
   try {
     await transporter.sendMail({
       from: config.NOTIFY_EMAIL,
       to: config.NOTIFY_EMAIL,
-      subject: `Tapt anrop – ${time}`,
-      text: `Du hadde et innkommende anrop ${time}.\n\nSamtalelogg:\n\n${body}`,
+      subject: `Tapt anrop${callerInfo} – ${time}`,
+      text: `Du hadde et innkommende anrop${callerInfo} ${time}.\n\nSamtalelogg:\n\n${body}`,
     });
     console.log('[Notify] Email sent');
   } catch (err) {
