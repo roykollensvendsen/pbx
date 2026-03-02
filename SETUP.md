@@ -251,13 +251,28 @@ Edit `agent/.env` and fill in:
 - `ELEVENLABS_API_KEY` — from elevenlabs.io
 - `ELEVENLABS_VOICE_ID` — voice ID from ElevenLabs voice library
 
-### 14b. Install dependencies
+### 14b. chan_mobile watchdog
+
+The watchdog monitors the Bluetooth device connection and automatically reloads
+`chan_mobile.so` when the device disconnects or enters a broken state (e.g. after
+SCO audio error 104). It starts automatically with `agent-start.sh`, but can also
+be run standalone:
+
+```bash
+bash scripts/chan-mobile-watchdog.sh
+```
+
+The watchdog checks every 15 seconds:
+- Whether the `android` device shows `Connected=Yes` in `mobile show devices`
+- Whether recent `read error` entries exist in the Asterisk log (broken state detection)
+
+### 14c. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 14c. Start the agent
+### 14d. Start the agent
 
 ```bash
 npm run agent
@@ -268,7 +283,7 @@ Or for echo test (no API keys needed):
 npm run agent:echo
 ```
 
-### 14d. Test
+### 14e. Test
 
 - **Echo test:** Start with `npm run agent:echo`, dial `104` from any phone — hear yourself echoed back
 - **AI test:** Start with `npm run agent`, dial `104` from any phone — speak Norwegian, hear AI response

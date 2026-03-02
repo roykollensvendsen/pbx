@@ -14,5 +14,17 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
+echo "Starting chan_mobile watchdog in background..."
+bash scripts/chan-mobile-watchdog.sh &
+WATCHDOG_PID=$!
+echo "Watchdog PID: $WATCHDOG_PID"
+
+cleanup() {
+  echo "Stopping watchdog (PID $WATCHDOG_PID)..."
+  kill "$WATCHDOG_PID" 2>/dev/null || true
+  wait "$WATCHDOG_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 echo "Starting AI phone agent on port ${AGENT_PORT:-9092}..."
-exec node agent/server.js
+node agent/server.js
