@@ -249,7 +249,36 @@ Edit `agent/.env` and fill in:
 - `ANTHROPIC_API_KEY` — from console.anthropic.com
 - `DEEPGRAM_API_KEY` — from console.deepgram.com
 - `ELEVENLABS_API_KEY` — from elevenlabs.io
-- `ELEVENLABS_VOICE_ID` — voice ID from ElevenLabs voice library
+- `ELEVENLABS_VOICE_ID` — see below
+
+**Finding an ElevenLabs voice ID:**
+1. Go to elevenlabs.io → **Voices** → **Voice Library**
+2. Browse or search for a voice (e.g. "Norwegian" or "Scandinavian")
+3. Click a voice → the URL contains the voice ID, or click **Use** and copy the ID
+4. Free tier cannot use cloned/library voices — use **premade voices** only
+5. For Norwegian speech, use the `eleven_multilingual_v2` model (set in `.env` or default in config.js)
+
+**Email notifications (optional):**
+- `NOTIFY_EMAIL` — your Gmail address
+- `NOTIFY_EMAIL_PASSWORD` — a Gmail **App Password** (not your regular password)
+
+To create a Gmail App Password:
+1. Go to myaccount.google.com → **Security** → **2-Step Verification** (must be enabled)
+2. Scroll to **App passwords** → create one for "Mail" / "Other (PBX)"
+3. Copy the 16-character password into `.env`
+
+> **Tip:** Since this is a RAM-only session, back up your `.env` via email:
+> ```bash
+> node -e "
+> const path = require('path');
+> require('dotenv').config({ path: path.join(__dirname, 'agent', '.env') });
+> const nodemailer = require('nodemailer');
+> const fs = require('fs');
+> const email = process.env.NOTIFY_EMAIL;
+> const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: email, pass: process.env.NOTIFY_EMAIL_PASSWORD } });
+> transporter.sendMail({ from: email, to: email, subject: 'Backup: agent/.env', attachments: [{ filename: '.env', content: fs.readFileSync(path.join(__dirname, 'agent', '.env'), 'utf8') }] }).then(() => console.log('Sent')).catch(e => console.error(e.message));
+> "
+> ```
 
 ### 14b. chan_mobile watchdog
 
@@ -266,13 +295,37 @@ The watchdog checks every 15 seconds:
 - Whether the `android` device shows `Connected=Yes` in `mobile show devices`
 - Whether recent `read error` entries exist in the Asterisk log (broken state detection)
 
-### 14c. Install dependencies
+### 14c. Audio pipeline details
+
+The agent uses Asterisk's AudioSocket protocol (TCP on port 9092) with a hardcoded UUID
+(`00000000-0000-0000-0000-000000000104`). Asterisk's `${UNIQUEID}` cannot be used because
+Asterisk call IDs are not valid UUID format.
+
+Audio format through the pipeline:
+- **Asterisk ↔ Agent:** 16-bit signed little-endian, 8kHz mono (`slin`), 320 bytes/frame (20ms)
+- **Deepgram STT:** Same 8kHz PCM sent via WebSocket
+- **ElevenLabs TTS:** Returns 22050Hz PCM, resampled to 8kHz by `resampler.js`
+- **Playback pacing:** Frames sent at 20ms intervals to match real-time audio
+
+STT is muted while TTS is playing to prevent the agent from hearing itself and
+generating false transcriptions (barge-in prevention).
+
+### 14d. Caller ID file
+
+Asterisk writes caller info to `/tmp/agent-callerid` before connecting to AudioSocket.
+The agent reads this file to greet the caller by name.
+
+- Asterisk runs as root, so the file is owned by root
+- `/tmp` has the sticky bit, so the `demo` user cannot delete root-owned files
+- The dialplan for extension 104 runs `rm -f /tmp/agent-callerid` (as root) to clean up stale files before writing a new one
+
+### 14e. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 14d. Start the agent
+### 14f. Start the agent
 
 ```bash
 npm run agent
@@ -283,7 +336,23 @@ Or for echo test (no API keys needed):
 npm run agent:echo
 ```
 
-### 14e. Test
+For production use (agent + watchdog in background):
+```bash
+bash scripts/agent-start.sh
+```
+
+This starts both the AI agent and the chan_mobile watchdog. Output is logged to the terminal.
+
+### 14g. Stopping the agent
+
+- If running in foreground: `Ctrl+C`
+- If started via `agent-start.sh`: kill the background processes:
+  ```bash
+  pkill -f "node agent/server.js"
+  pkill -f "chan-mobile-watchdog"
+  ```
+
+### 14h. Test
 
 - **Echo test:** Start with `npm run agent:echo`, dial `104` from any phone — hear yourself echoed back
 - **AI test:** Start with `npm run agent`, dial `104` from any phone — speak Norwegian, hear AI response
@@ -314,12 +383,16 @@ npm run agent:echo
 - **chan_mobile reload:** `core reload` does NOT reload chan_mobile. You must `module unload chan_mobile.so` then `module load chan_mobile.so`.
 - **HT801 v2 dial plan limitations:** The HT801 v2 only reliably sends extensions matching the `10x` pattern (100–109). Star codes (`*97`, `*86`) and arbitrary numbers (`123`) are silently dropped by the phone without sending a SIP INVITE. Always use `10x`-range extensions for custom features.
 - **HT801 v2 P290 and `+` encoding:** The `+` character in P290 (Dial Plan) values is silently converted to a space because the config API uses `application/x-www-form-urlencoded`. Use `x.` instead of `x+` in dial plan patterns.
+- **`/tmp/agent-callerid` owned by root:** Asterisk (running as root) writes this file, but the agent runs as `demo`. The `/tmp` sticky bit prevents `demo` from deleting root-owned files. Solved by having the extension 104 dialplan run `rm -f /tmp/agent-callerid` (executes as root) before writing a new one.
+- **API failure email alerts:** The agent sends email alerts when Deepgram, Anthropic, or ElevenLabs APIs fail (e.g. expired keys, quota exceeded). Rate limited to 1 email per service per 5 minutes. Requires `NOTIFY_EMAIL` and `NOTIFY_EMAIL_PASSWORD` in `.env`.
 - **chan_mobile CIEV race on back-to-back calls:** When a new incoming call arrives immediately after a previous call ends, the Android phone sends `callsetup=incoming` (new call) followed by a lagging `call=0` (old call done). chan_mobile interprets `call=0` as the *new* call being disconnected, causing the caller to go straight to the Android handset. Fixed by `patches/chan_mobile-ciev-call-race.patch`, which ignores `call=0` during incoming call setup (before the channel is created). The patch is applied automatically during `asterisk-build.sh`.
 
 ## Notes
 
 - MX Linux live session runs entirely in RAM — nothing persists across reboots.
 - The default user is `demo` with password `demo`.
+- MX Linux uses **sysvinit**, not systemd. Use `/etc/init.d/bluetooth restart` instead of `systemctl restart bluetooth`.
 - Git is not installed by default and must be installed each session.
 - Asterisk must be rebuilt from source each session (not in Debian Trixie repos).
 - Bluetooth pairing must be redone each session.
+- Back up `agent/.env` via email before rebooting (see Step 14a).
