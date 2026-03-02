@@ -129,7 +129,7 @@ function handleConnection(socket) {
 
   // --- Full AI pipeline ---
   stt = new DeepgramSTT();
-  brain = new Brain();
+  brain = new Brain(callerNumber, callerName);
 
   // Buffer for accumulating final transcripts into a complete utterance
   let utteranceText = '';
@@ -234,7 +234,9 @@ function handleConnection(socket) {
     setTimeout(async () => {
       if (destroyed) return;
       processing = true;
-      const greeting = 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?';
+      const greeting = callerName
+        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?`
+        : 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?';
       console.log(`[Brain] Greeting: "${greeting}"`);
       // Add to conversation history so Claude knows the context
       brain.messages.push({ role: 'assistant', content: greeting });

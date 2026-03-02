@@ -19,9 +19,16 @@ Viktige regler:
 Eksempel på åpning: "Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?"`;
 
 class Brain {
-  constructor() {
+  constructor(callerNumber, callerName) {
     this.client = new Anthropic();
     this.messages = [];
+    this.systemPrompt = SYSTEM_PROMPT;
+    if (callerName || callerNumber) {
+      const parts = [];
+      if (callerName) parts.push(`Navn: ${callerName}`);
+      if (callerNumber) parts.push(`Nummer: ${callerNumber}`);
+      this.systemPrompt += `\n\nInformasjon om innringeren:\n${parts.join('\n')}\n\nDu trenger ikke spørre om navn eller nummer hvis du allerede har det. Bruk navnet naturlig i samtalen.`;
+    }
   }
 
   async respond(userText) {
@@ -32,7 +39,7 @@ class Brain {
     const stream = this.client.messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 300,
-      system: SYSTEM_PROMPT,
+      system: this.systemPrompt,
       messages: this.messages,
     });
 
@@ -55,7 +62,7 @@ class Brain {
     const stream = this.client.messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 300,
-      system: SYSTEM_PROMPT,
+      system: this.systemPrompt,
       messages: this.messages,
     });
 
