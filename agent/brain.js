@@ -33,13 +33,55 @@ function formatNorwegianTime() {
   return `${day} ${date}. ${month} ${year}, klokka ${hours}:${minutes}`;
 }
 
+const WEATHER_SYMBOLS = {
+  clearsky: 'klarvær',
+  fair: 'lettskyet',
+  partlycloudy: 'delvis skyet',
+  cloudy: 'skyet',
+  lightrainshowers: 'lette regnbyger',
+  rainshowers: 'regnbyger',
+  heavyrainshowers: 'kraftige regnbyger',
+  lightrainshowersandthunder: 'lette regnbyger og torden',
+  rainshowersandthunder: 'regnbyger og torden',
+  heavyrainshowersandthunder: 'kraftige regnbyger og torden',
+  lightsleetshowers: 'lette sluddbyger',
+  sleetshowers: 'sluddbyger',
+  heavysleetshowers: 'kraftige sluddbyger',
+  lightsnowshowers: 'lette snøbyger',
+  snowshowers: 'snøbyger',
+  heavysnowshowers: 'kraftige snøbyger',
+  lightrain: 'lett regn',
+  rain: 'regn',
+  heavyrain: 'kraftig regn',
+  lightrainandthunder: 'lett regn og torden',
+  rainandthunder: 'regn og torden',
+  heavyrainandthunder: 'kraftig regn og torden',
+  lightsleet: 'lett sludd',
+  sleet: 'sludd',
+  heavysleet: 'kraftig sludd',
+  lightsnow: 'lett snø',
+  snow: 'snø',
+  heavysnow: 'kraftig snø',
+  fog: 'tåke',
+};
+
 async function fetchWeather() {
   try {
-    const res = await fetch('https://wttr.in/Tvedestrand?format=3&lang=no');
+    // Tvedestrand: 58.6167°N, 8.9333°E
+    const res = await fetch('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=58.6167&lon=8.9333', {
+      headers: { 'User-Agent': 'pbx-phone-agent github.com/roykollensvendsen/pbx' },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = (await res.text()).trim();
-    console.log(`[Brain] Weather: ${text}`);
-    return text;
+    const data = await res.json();
+    const now = data.properties.timeseries[0].data;
+    const temp = Math.round(now.instant.details.air_temperature);
+    const symbolCode = (now.next_1_hours || now.next_6_hours).summary.symbol_code;
+    // Strip _day/_night/_polartwilight suffix
+    const baseSymbol = symbolCode.replace(/_(day|night|polartwilight)$/, '');
+    const description = WEATHER_SYMBOLS[baseSymbol] || baseSymbol;
+    const result = `Tvedestrand: ${description}, ${temp} grader`;
+    console.log(`[Brain] Weather: ${result}`);
+    return result;
   } catch (err) {
     console.error(`[Brain] Failed to fetch weather: ${err.message}`);
     return null;
