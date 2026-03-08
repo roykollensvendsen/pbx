@@ -27,7 +27,7 @@ module.exports = {
   AGENT_PORT: parseInt(process.env.AGENT_PORT || '9092', 10),
   AGENT_LANGUAGE: process.env.AGENT_LANGUAGE || 'no',
   ELEVENLABS_MODEL: process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5',
-  ELEVENLABS_LANGUAGE_CODE: process.env.ELEVENLABS_LANGUAGE_CODE || 'nb',
+  ELEVENLABS_LANGUAGE_CODE: process.env.ELEVENLABS_LANGUAGE_CODE || 'no',
   ECHO_MODE: !!process.env.ECHO_MODE,
   NOTIFY_EMAIL: process.env.NOTIFY_EMAIL || '',
   NOTIFY_EMAIL_PASSWORD: process.env.NOTIFY_EMAIL_PASSWORD || '',
