@@ -140,7 +140,7 @@ class Brain {
         const lines = contactEntries.map(([name, num]) => `  ${name}: ${num}`).join('\n');
         contactInfo = `\n- Du har tilgang til en kontaktliste — bruk denne før du søker på nett:\n${lines}`;
       }
-      this.systemPrompt += `\n- Du kan ringe telefonnumre for brukeren — bruk make_call-verktøyet\n- Sjekk kontaktlisten først, deretter bruk nettsøk om nødvendig\n- Bekreft nummeret med brukeren, og si "Jeg kobler deg nå" rett før du kobler${contactInfo}`;
+      this.systemPrompt += `\n- Du kan ringe telefonnumre for brukeren — bruk make_call-verktøyet\n- Sjekk kontaktlisten først, deretter bruk nettsøk om nødvendig\n- Bekreft nummeret ÉN gang med brukeren. Når brukeren sier ja, ring, ok, eller lignende — bruk make_call UMIDDELBART. Ikke be om bekreftelse to ganger.\n- Si "Jeg kobler deg nå" og bruk make_call i samme svar${contactInfo}`;
     }
     if (callerName || callerNumber) {
       const parts = [];
