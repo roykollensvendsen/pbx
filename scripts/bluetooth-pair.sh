@@ -18,7 +18,7 @@ echo "Adapter: $HCI_DEV"
 
 # Ensure adapter is up
 echo "Bringing up Bluetooth adapter..."
-echo "demo" | sudo -S hciconfig "$HCI_DEV" up 2>/dev/null || true
+sudo -n hciconfig "$HCI_DEV" up 2>/dev/null || true
 sleep 1
 
 echo "Adapter info:"

@@ -35,7 +35,7 @@ If no devices found on default interface, try other interfaces (check with `ip l
 Check Asterisk SIP endpoint registration status.
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "pjsip show endpoints"
+sudo -n asterisk -rx "pjsip show endpoints"
 ```
 
 If Asterisk is not installed yet, report that and suggest running the Asterisk setup.
@@ -77,7 +77,7 @@ After writing, ask the user if they want to reboot the device to apply changes.
 Search for Bluetooth mobile devices from Asterisk (used after pairing to find RFCOMM port).
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "mobile search"
+sudo -n asterisk -rx "mobile search"
 ```
 
 Report the device name, BD address, and RFCOMM channel. Remind the user to update `configs/asterisk/chan_mobile.conf` with the results.
@@ -87,7 +87,7 @@ Report the device name, BD address, and RFCOMM channel. Remind the user to updat
 Show connected Bluetooth mobile devices.
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "mobile show devices"
+sudo -n asterisk -rx "mobile show devices"
 ```
 
 ### `/pbx agent start`
@@ -95,7 +95,7 @@ echo "demo" | sudo -S asterisk -rx "mobile show devices"
 Start the AI phone agent server.
 
 ```bash
-cd /home/demo/phone-home && npm run agent
+cd ~/pbx && npm run agent
 ```
 
 If `agent/.env` is missing, tell the user to copy from `agent/.env.example` and fill in API keys.
@@ -105,7 +105,7 @@ If `agent/.env` is missing, tell the user to copy from `agent/.env.example` and 
 Start the AI phone agent in echo mode (no API keys needed, for testing AudioSocket).
 
 ```bash
-cd /home/demo/phone-home && npm run agent:echo
+cd ~/pbx && npm run agent:echo
 ```
 
 ### `/pbx agent stop`
@@ -121,7 +121,7 @@ pkill -f "node agent/server.js"
 Reload Asterisk configuration after changes.
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "core reload"
+sudo -n asterisk -rx "core reload"
 ```
 
 ## HT801 v2 P-value Reference

@@ -10,7 +10,7 @@ PBX project on MX Linux (RAM-only live session).
 
 ## Environment
 - MX Linux live session (RAM-only, nothing persists across reboots)
-- Default user: `demo`, sudo password: `demo`
+- Sudo: use `sudo -n` (NOPASSWD configured)
 - Node.js available, npm for package management
 - Remote: git@github.com:roykollensvendsen/pbx.git
 

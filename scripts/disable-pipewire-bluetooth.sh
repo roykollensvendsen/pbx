@@ -10,8 +10,8 @@ TARGET_DIR="/etc/wireplumber/wireplumber.conf.d"
 
 echo "=== Disabling PipeWire Bluetooth ==="
 
-echo "demo" | sudo -S mkdir -p "$TARGET_DIR"
-echo "demo" | sudo -S cp "$SOURCE" "$TARGET_DIR/90-disable-bluetooth.conf"
+sudo -n mkdir -p "$TARGET_DIR"
+sudo -n cp "$SOURCE" "$TARGET_DIR/90-disable-bluetooth.conf"
 echo "Copied override to $TARGET_DIR/"
 
 echo "Restarting WirePlumber..."

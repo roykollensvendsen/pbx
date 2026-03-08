@@ -15,16 +15,16 @@ log() {
 
 reload_chan_mobile() {
   log "Reloading chan_mobile.so..."
-  echo "demo" | sudo -S asterisk -rx "module unload chan_mobile.so" 2>/dev/null || true
+  sudo -n asterisk -rx "module unload chan_mobile.so" 2>/dev/null || true
   sleep 2
-  echo "demo" | sudo -S asterisk -rx "module load chan_mobile.so" 2>/dev/null || true
+  sudo -n asterisk -rx "module load chan_mobile.so" 2>/dev/null || true
   log "Reload complete. Waiting ${RELOAD_COOLDOWN}s for reconnection..."
   sleep "$RELOAD_COOLDOWN"
 }
 
 check_device_connected() {
   local output
-  output=$(echo "demo" | sudo -S asterisk -rx "mobile show devices" 2>/dev/null) || return 1
+  output=$(sudo -n asterisk -rx "mobile show devices" 2>/dev/null) || return 1
 
   # Parse the android device line — columns: ID Address Group Adapter Connected State
   local connected
@@ -48,7 +48,7 @@ check_recent_read_errors() {
 
   # Grep for read error lines and check if any are recent
   local errors
-  errors=$(echo "demo" | sudo -S grep "chan_mobile" "$ASTERISK_LOG" 2>/dev/null \
+  errors=$(sudo -n grep "chan_mobile" "$ASTERISK_LOG" 2>/dev/null \
     | grep -i "read error" \
     | tail -5) || return 1
 

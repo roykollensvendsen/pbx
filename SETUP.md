@@ -14,7 +14,7 @@ npm install -g @anthropic-ai/claude-code
 
 ```bash
 setxkbmap no
-echo "demo" | sudo -S bash -c 'cat > /etc/X11/xorg.conf.d/00-keyboard.conf << EOF
+sudo -n bash -c 'cat > /etc/X11/xorg.conf.d/00-keyboard.conf << EOF
 Section "InputClass"
     Identifier "system-keyboard"
     MatchIsKeyboard "on"
@@ -29,18 +29,15 @@ EOF'
 ## 3. Install Git
 
 ```bash
-echo "demo" | sudo -S apt-get install -y git
+sudo -n apt-get install -y git
 ```
 
-> **Note:** Default password on MX Linux live session is `demo`.
-
-## 4. Initialize the Project Repository
+## 4. Clone the Project Repository
 
 ```bash
-mkdir -p ~/phone-home
-cd ~/phone-home
-git init
-git branch -m main
+cd ~
+git clone git@github.com:roykollensvendsen/pbx.git
+cd ~/pbx
 ```
 
 ## 5. Configure Git Identity
@@ -61,38 +58,14 @@ Add the public key to GitHub: **github.com → Settings → SSH and GPG keys →
 
 > **Note:** Since this is a RAM-only session, the key must be regenerated and added to GitHub each reboot.
 
-## 7. Connect to GitHub Remote
+## 7. Install npm Dependencies
 
 ```bash
-git remote add origin git@github.com:roykollensvendsen/pbx.git
-git branch -M main
-git push -u origin main
+cd ~/pbx
+npm install
 ```
 
-## 8. Create Initial Commit
-
-```bash
-touch .gitkeep
-git add .gitkeep
-git commit -m "chore: initial commit"
-```
-
-## 9. Install Commitlint
-
-```bash
-npm init -y
-npm install --save-dev @commitlint/cli @commitlint/config-conventional
-```
-
-Create `commitlint.config.js`:
-
-```js
-module.exports = {
-  extends: ['@commitlint/config-conventional'],
-};
-```
-
-## 10. Set Up Commit-msg Git Hook
+## 8. Set Up Commit-msg Git Hook
 
 ```bash
 cat > .git/hooks/commit-msg << 'HOOK'
@@ -103,29 +76,30 @@ HOOK
 chmod +x .git/hooks/commit-msg
 ```
 
-## 11. Install Network Tools
+## 9. Install Network Tools
 
 ```bash
-echo "demo" | sudo -S apt-get install -y nmap arp-scan
+sudo -n apt-get install -y nmap arp-scan
 ```
 
 > Required for scanning the local network for Grandstream HT801 devices (`scripts/scan-devices.sh`).
 
-## 12. Launch Claude Code
+## 10. Launch Claude Code
 
 ```bash
-cd ~/phone-home
+cd ~/pbx
 claude
 ```
 
 > Claude Code will automatically read `CLAUDE.md` for project conventions.
+> From here, you can run `/pbx` to set up the full PBX, or follow the manual steps below.
 
-## 13. Asterisk PBX with Bluetooth Mobile Bridging
+## 11. Asterisk PBX with Bluetooth Mobile Bridging
 
 This sets up Asterisk with chan_mobile to bridge cellular calls from an Android phone
 (via Bluetooth) to the 3 HT801 SIP phones.
 
-### 13a. Run the master setup script
+### 11a. Run the master setup script
 
 ```bash
 bash scripts/asterisk-setup.sh
@@ -144,7 +118,7 @@ This runs 8 steps automatically:
 > **Note:** The script will detect the adapter name (may be `hci1` after btusb reload)
 > and tell you to update `chan_mobile.conf` accordingly.
 
-### 13b. Update chan_mobile.conf with adapter name
+### 11b. Update chan_mobile.conf with adapter name
 
 After the setup script, check which `hciX` adapter is active:
 
@@ -156,7 +130,7 @@ Edit `configs/asterisk/chan_mobile.conf`:
 - Set `id = hciX` in the `[adapter]` section
 - Set `adapter = hciX` in the `[android]` section (must match the `id` value, NOT the section name)
 
-### 13c. Pair Android phone via Bluetooth
+### 11c. Pair Android phone via Bluetooth
 
 **CRITICAL: Pairing must be initiated FROM the Android phone, not from the PBX.**
 Pairing from the PBX side fails to store link keys (bonding doesn't complete).
@@ -178,27 +152,27 @@ Then back on the PBX:
 bluetoothctl trust <ANDROID_BD_ADDRESS>
 ```
 
-### 13d. Find RFCOMM channel and update chan_mobile.conf
+### 11d. Find RFCOMM channel and update chan_mobile.conf
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "mobile search"
+sudo -n asterisk -rx "mobile search"
 ```
 
 Edit `configs/asterisk/chan_mobile.conf`:
 - Set `address = <ANDROID_BD_ADDRESS>` in the `[android]` section
 - Set `port = <RFCOMM_PORT>` from the search results
 
-### 13e. Redeploy configs and load chan_mobile
+### 11e. Redeploy configs and load chan_mobile
 
 ```bash
 bash scripts/asterisk-deploy-configs.sh
-echo "demo" | sudo -S asterisk -rx "module unload chan_mobile.so"
-echo "demo" | sudo -S asterisk -rx "module load chan_mobile.so"
+sudo -n asterisk -rx "module unload chan_mobile.so"
+sudo -n asterisk -rx "module load chan_mobile.so"
 ```
 
 > **Note:** chan_mobile does not support `core reload` — you must unload/load the module.
 
-### 13f. Provision HT801 phones
+### 11f. Provision HT801 phones
 
 ```bash
 bash scripts/ht801-provision.sh 192.168.10.138 101 pbxpass2024
@@ -209,11 +183,11 @@ bash scripts/ht801-provision.sh 192.168.10.100 103 pbxpass2024
 > **Note:** The HT801 v2 API silently ignores writes to P34 (SIP auth password).
 > The pjsip.conf uses no auth since the phones are on a trusted LAN.
 
-### 13g. Verify
+### 11g. Verify
 
 ```bash
-echo "demo" | sudo -S asterisk -rx "pjsip show contacts"    # All 3 extensions registered
-echo "demo" | sudo -S asterisk -rx "mobile show devices"     # Android: Connected=Yes, State=Free
+sudo -n asterisk -rx "pjsip show contacts"    # All 3 extensions registered
+sudo -n asterisk -rx "mobile show devices"     # Android: Connected=Yes, State=Free
 ```
 
 Test calls:
@@ -234,12 +208,12 @@ Test calls:
 > **Important:** HT801 v2 phones only reliably send extensions in the `10x` range (100–109).
 > Star codes and other numbers are silently dropped. See Known Gotchas.
 
-## 14. AI Phone Agent (Claude-powered)
+## 12. AI Phone Agent (Claude-powered)
 
 An AI receptionist answers incoming cellular calls when nobody picks up the phone.
 Uses Deepgram (STT) → Claude (brain) → ElevenLabs (TTS) pipeline via Asterisk AudioSocket.
 
-### 14a. Configure API keys
+### 12a. Configure API keys
 
 ```bash
 cp agent/.env.example agent/.env
@@ -280,7 +254,7 @@ To create a Gmail App Password:
 > "
 > ```
 
-### 14b. chan_mobile watchdog
+### 12b. chan_mobile watchdog
 
 The watchdog monitors the Bluetooth device connection and automatically reloads
 `chan_mobile.so` when the device disconnects or enters a broken state (e.g. after
@@ -295,7 +269,7 @@ The watchdog checks every 15 seconds:
 - Whether the `android` device shows `Connected=Yes` in `mobile show devices`
 - Whether recent `read error` entries exist in the Asterisk log (broken state detection)
 
-### 14c. Audio pipeline details
+### 12c. Audio pipeline details
 
 The agent uses Asterisk's AudioSocket protocol (TCP on port 9092) with a hardcoded UUID
 (`00000000-0000-0000-0000-000000000104`). Asterisk's `${UNIQUEID}` cannot be used because
@@ -310,23 +284,23 @@ Audio format through the pipeline:
 STT is muted while TTS is playing to prevent the agent from hearing itself and
 generating false transcriptions (barge-in prevention).
 
-### 14d. Caller ID file
+### 12d. Caller ID file
 
 Asterisk writes caller info to `/tmp/agent-callerid` (with `chmod 666`) in the `incoming-mobile`
 context before dialing the agent. The agent reads this file to greet the caller by name and
 include caller info in the email notification.
 
-- The file is written by Asterisk (root) with `chmod 666` so the agent (demo) can read it
+- The file is written by Asterisk (root) with `chmod 666` so the agent (running as non-root) can read it
 - The `incoming-mobile` context uses `>` redirect which overwrites any existing file — no cleanup needed
 - Do NOT add `rm -f` to extension 104 — this would delete the file before the agent reads it
 
-### 14e. Install dependencies
+### 12e. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 14f. Start the agent
+### 12f. Start the agent
 
 ```bash
 npm run agent
@@ -344,7 +318,7 @@ bash scripts/agent-start.sh
 
 This starts both the AI agent and the chan_mobile watchdog. Output is logged to the terminal.
 
-### 14g. Stopping the agent
+### 12g. Stopping the agent
 
 - If running in foreground: `Ctrl+C`
 - If started via `agent-start.sh`: kill the background processes:
@@ -353,7 +327,7 @@ This starts both the AI agent and the chan_mobile watchdog. Output is logged to 
   pkill -f "chan-mobile-watchdog"
   ```
 
-### 14h. Test
+### 12h. Test
 
 - **Echo test:** Start with `npm run agent:echo`, dial `104` from any phone — hear yourself echoed back
 - **AI test:** Start with `npm run agent`, dial `104` from any phone — speak Norwegian, hear AI response
@@ -371,8 +345,8 @@ This starts both the AI agent and the chan_mobile watchdog. Output is logged to 
 
 ## Known Gotchas
 
-- **`sudo` in scripts:** Always use `echo "demo" | sudo -S` instead of bare `sudo`. Non-interactive shells (e.g. Claude Code's Bash tool) have no TTY, so `sudo` without `-S` fails with "a terminal is required to read the password".
-- **Asterisk source ownership:** `sudo tar xzf` extracts files owned by root. You must `chown -R demo:demo` the source directory before running `./configure`, otherwise it fails writing to `config.log`.
+- **`sudo` in scripts:** Scripts use `sudo -n` (non-interactive, no password prompt). Ensure the current user has `NOPASSWD` sudo access, e.g. `echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-nopasswd`.
+- **Asterisk source ownership:** `sudo tar xzf` extracts files owned by root. The download script runs `chown -R $(id -un):$(id -gn)` on the source directory before building.
 - **Asterisk not in Debian Trixie repos:** Must build from source. The `asterisk-setup.sh` script handles this end-to-end.
 - **PipeWire steals Bluetooth audio:** PipeWire's WirePlumber claims HFP/HSP profiles on the BT adapter, preventing Asterisk's `chan_mobile` from getting SCO audio. The WirePlumber override in `configs/wireplumber/90-disable-bluetooth.conf` disables this. Must be applied before starting Asterisk.
 - **Asterisk must run as root:** Required for Bluetooth SCO socket access. Configured in `configs/asterisk/asterisk.conf` (`runuser = root`).
@@ -387,13 +361,12 @@ This starts both the AI agent and the chan_mobile watchdog. Output is logged to 
 - **`/tmp/agent-callerid` must not be deleted in extension 104:** The `incoming-mobile` context writes this file before dialing the agent. Do NOT `rm -f` it in extension 104 — this deletes the file before the agent reads it, causing missing caller ID in email notifications. The file is overwritten by `>` redirect each time, so no cleanup is needed.
 - **API failure email alerts:** The agent sends email alerts when Deepgram, Anthropic, or ElevenLabs APIs fail (e.g. expired keys, quota exceeded). Rate limited to 1 email per service per 5 minutes. Requires `NOTIFY_EMAIL` and `NOTIFY_EMAIL_PASSWORD` in `.env`.
 - **chan_mobile CIEV race on back-to-back calls:** When a new incoming call arrives immediately after a previous call ends, the Android phone sends `callsetup=incoming` (new call) followed by a lagging `call=0` (old call done). chan_mobile interprets `call=0` as the *new* call being disconnected, causing the caller to go straight to the Android handset. Fixed by `patches/chan_mobile-ciev-call-race.patch`, which ignores `call=0` during incoming call setup (before the channel is created). The patch is applied automatically during `asterisk-build.sh`.
+- **HT801 phones retain provisioning:** The HT801 phones persist their SIP config across PBX reboots. No need to re-provision unless their IPs change.
 
 ## Notes
 
 - MX Linux live session runs entirely in RAM — nothing persists across reboots.
-- The default user is `demo` with password `demo`.
 - MX Linux uses **sysvinit**, not systemd. Use `/etc/init.d/bluetooth restart` instead of `systemctl restart bluetooth`.
-- Git is not installed by default and must be installed each session.
 - Asterisk must be rebuilt from source each session (not in Debian Trixie repos).
 - Bluetooth pairing must be redone each session.
-- Back up `agent/.env` via email before rebooting (see Step 14a).
+- Back up `agent/.env` via email before rebooting (see Step 12a), or restore from `~/Nedlastinger/env` after download.

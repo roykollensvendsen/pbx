@@ -17,20 +17,20 @@ echo ""
 
 # Step 2: Install Bluetooth firmware package
 echo "[Step 2/8] Installing Bluetooth firmware package..."
-echo "demo" | sudo -S apt-get update -qq
-echo "demo" | sudo -S apt-get install -y bluez-firmware
+sudo -n apt-get update -qq
+sudo -n apt-get install -y bluez-firmware
 echo ""
 
 # Step 3: Download Broadcom dongle firmware (not in bluez-firmware package)
 echo "[Step 3/8] Downloading Broadcom BCM20702A1 dongle firmware..."
 if [ ! -f /lib/firmware/brcm/BCM20702A1-050d-065a.hcd ]; then
-  echo "demo" | sudo -S wget -q -O /lib/firmware/brcm/BCM20702A1-050d-065a.hcd \
+  sudo -n wget -q -O /lib/firmware/brcm/BCM20702A1-050d-065a.hcd \
     "https://raw.githubusercontent.com/winterheart/broadcom-bt-firmware/master/brcm/BCM20702A1-050d-065a.hcd"
   echo "Firmware downloaded. Reloading btusb to apply..."
-  echo "demo" | sudo -S hciconfig hci0 down 2>/dev/null || true
-  echo "demo" | sudo -S rmmod btusb 2>/dev/null || true
+  sudo -n hciconfig hci0 down 2>/dev/null || true
+  sudo -n rmmod btusb 2>/dev/null || true
   sleep 1
-  echo "demo" | sudo -S modprobe btusb
+  sudo -n modprobe btusb
   sleep 3
 else
   echo "Firmware already present."
@@ -43,18 +43,18 @@ if [ -z "$HCI_DEV" ]; then
   exit 1
 fi
 echo "Bluetooth adapter: $HCI_DEV"
-echo "demo" | sudo -S hciconfig "$HCI_DEV" up 2>/dev/null || true
+sudo -n hciconfig "$HCI_DEV" up 2>/dev/null || true
 echo ""
 
 # Step 4: Enable BlueZ SDP server (--compat mode)
 echo "[Step 4/8] Enabling BlueZ SDP server (--compat mode)..."
-echo "demo" | sudo -S sed -i 's|--exec $DAEMON -- $NOPLUGIN_OPTION|--exec $DAEMON -- --compat $NOPLUGIN_OPTION|' /etc/init.d/bluetooth 2>/dev/null || true
-echo "demo" | sudo -S /etc/init.d/bluetooth restart 2>/dev/null || true
+sudo -n sed -i 's|--exec $DAEMON -- $NOPLUGIN_OPTION|--exec $DAEMON -- --compat $NOPLUGIN_OPTION|' /etc/init.d/bluetooth 2>/dev/null || true
+sudo -n /etc/init.d/bluetooth restart 2>/dev/null || true
 sleep 2
-echo "demo" | sudo -S hciconfig "$HCI_DEV" up 2>/dev/null || true
+sudo -n hciconfig "$HCI_DEV" up 2>/dev/null || true
 
 # Verify SDP
-if echo "demo" | sudo -S sdptool browse local 2>&1 | grep -q "Service RecHandle"; then
+if sudo -n sdptool browse local 2>&1 | grep -q "Service RecHandle"; then
   echo "SDP server: OK"
 else
   echo "WARNING: SDP server not responding"

@@ -8,7 +8,7 @@ INTERFACE="${1:-eth0}"
 GRANDSTREAM_OUIS="00:0b:82|c0:74:ad|ec:74:d7|14:4c:ff"
 
 echo "Scanning for Grandstream devices on interface $INTERFACE..."
-RESULTS=$(echo "demo" | sudo -S arp-scan --localnet --interface="$INTERFACE" 2>/dev/null \
+RESULTS=$(sudo -n arp-scan --localnet --interface="$INTERFACE" 2>/dev/null \
     | grep -iE "$GRANDSTREAM_OUIS")
 
 if [ -z "$RESULTS" ]; then

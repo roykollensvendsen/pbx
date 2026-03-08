@@ -15,13 +15,13 @@ else
 fi
 
 echo "Extracting to $SRC_DIR/..."
-echo "demo" | sudo -S tar xzf asterisk-22-current.tar.gz -C "$SRC_DIR"
+sudo -n tar xzf asterisk-22-current.tar.gz -C "$SRC_DIR"
 
 # Find the extracted directory
 ASTERISK_DIR=$(ls -d "$SRC_DIR"/asterisk-22.* 2>/dev/null | head -1)
 
 # Fix ownership so build runs as normal user
-echo "demo" | sudo -S chown -R demo:demo "$ASTERISK_DIR"
+sudo -n chown -R "$(id -un):$(id -gn)" "$ASTERISK_DIR"
 if [ -z "$ASTERISK_DIR" ]; then
   echo "ERROR: Could not find extracted Asterisk directory"
   exit 1
