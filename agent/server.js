@@ -29,6 +29,13 @@ function handleConnection(socket) {
 
   function readCallerID() {
     try {
+      const stat = fs.statSync('/tmp/agent-callerid');
+      const ageMs = Date.now() - stat.mtimeMs;
+      if (ageMs > 5000) {
+        console.log(`[Server] Ignoring stale callerid file (${Math.round(ageMs / 1000)}s old)`);
+        try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
+        return false;
+      }
       const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
       const parts = raw.split('|');
       callerNumber = parts[0] || null;
