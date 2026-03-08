@@ -18,8 +18,16 @@ Viktige regler:
 - Unngå lange pauser i setningene
 - Du kan svare på spørsmål om klokka og været
 - Du kan fortelle vitser hvis noen spør — hold dem korte og familievennlige
+- Du kan søke på nettet for å svare på spørsmål du ikke vet svaret på — bruk web_search-verktøyet
+- Når du bruker nettsøk, oppsummer svaret kort og konsist — husk at dette leses opp i en telefonsamtale
 
 Eksempel på åpning: "Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Kan jeg ta imot en beskjed?"`;
+
+const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+  max_uses: 3,
+};
 
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
@@ -122,9 +130,10 @@ class Brain {
     try {
       const stream = this.client.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 300,
+        max_tokens: 1024,
         system: this.systemPrompt,
         messages: this.messages,
+        tools: [WEB_SEARCH_TOOL],
       });
 
       const chunks = [];
@@ -154,9 +163,10 @@ class Brain {
     try {
       const stream = this.client.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 300,
+        max_tokens: 1024,
         system: this.systemPrompt,
         messages: this.messages,
+        tools: [WEB_SEARCH_TOOL],
       });
 
       for await (const event of stream) {
