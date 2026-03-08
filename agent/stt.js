@@ -78,6 +78,12 @@ class DeepgramSTT extends EventEmitter {
     }
   }
 
+  keepAlive() {
+    if (this.ready && this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'KeepAlive' }));
+    }
+  }
+
   stop() {
     if (this.ws) {
       this.ready = false;

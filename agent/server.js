@@ -223,9 +223,13 @@ function handleConnection(socket) {
   }
 
   // Send silence frames to keep AudioSocket alive (Asterisk times out after 2s of no activity)
+  // Also send KeepAlive to Deepgram while TTS is playing to prevent idle timeout
   const keepAliveTimer = setInterval(() => {
-    if (!destroyed && !socket.destroyed && !ttsPlaying) {
+    if (destroyed || socket.destroyed) return;
+    if (!ttsPlaying) {
       socket.write(encodeAudio(SILENCE_FRAME));
+    } else if (stt) {
+      stt.keepAlive();
     }
   }, 200);
 
