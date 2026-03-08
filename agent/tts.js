@@ -27,6 +27,7 @@ class ElevenLabsTTS extends EventEmitter {
       const model = config.ELEVENLABS_MODEL;
       const params = new URLSearchParams({
         model_id: model,
+        language_code: config.ELEVENLABS_LANGUAGE_CODE,
         output_format: 'pcm_22050',
       });
 
