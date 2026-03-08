@@ -1,8 +1,20 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
+
+function loadContacts() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'contacts.json'), 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('[Brain] Failed to load contacts.json:', e.message);
+    return {};
+  }
+}
 
 const SYSTEM_PROMPT = `Du er en hyggelig og profesjonell AI-resepsjonist som svarer telefonen for Roy.
 
@@ -121,7 +133,14 @@ class Brain {
     this.canMakeCall = canMakeCall || false;
     this.systemPrompt = SYSTEM_PROMPT;
     if (this.canMakeCall) {
-      this.systemPrompt += `\n- Du kan ringe telefonnumre for brukeren — bruk make_call-verktøyet\n- Finn nummeret (bruk nettsøk om nødvendig), bekreft med brukeren, og si "Jeg kobler deg nå" rett før du kobler`;
+      const contacts = loadContacts();
+      const contactEntries = Object.entries(contacts);
+      let contactInfo = '';
+      if (contactEntries.length > 0) {
+        const lines = contactEntries.map(([name, num]) => `  ${name}: ${num}`).join('\n');
+        contactInfo = `\n- Du har tilgang til en kontaktliste — bruk denne før du søker på nett:\n${lines}`;
+      }
+      this.systemPrompt += `\n- Du kan ringe telefonnumre for brukeren — bruk make_call-verktøyet\n- Sjekk kontaktlisten først, deretter bruk nettsøk om nødvendig\n- Bekreft nummeret med brukeren, og si "Jeg kobler deg nå" rett før du kobler${contactInfo}`;
     }
     if (callerName || callerNumber) {
       const parts = [];
