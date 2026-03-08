@@ -29,6 +29,21 @@ const WEB_SEARCH_TOOL = {
   max_uses: 3,
 };
 
+const MAKE_CALL_TOOL = {
+  name: 'make_call',
+  description: 'Ring et telefonnummer for brukeren. Bekreft alltid nummeret med brukeren først. Si "Jeg kobler deg nå" rett før du bruker dette verktøyet.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      phone_number: {
+        type: 'string',
+        description: 'Telefonnummeret som skal ringes (f.eks. "37012345")',
+      },
+    },
+    required: ['phone_number'],
+  },
+};
+
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
 
@@ -100,10 +115,14 @@ async function fetchWeather() {
 }
 
 class Brain {
-  constructor(callerNumber, callerName) {
+  constructor(callerNumber, callerName, canMakeCall) {
     this.client = new Anthropic();
     this.messages = [];
+    this.canMakeCall = canMakeCall || false;
     this.systemPrompt = SYSTEM_PROMPT;
+    if (this.canMakeCall) {
+      this.systemPrompt += `\n- Du kan ringe telefonnumre for brukeren — bruk make_call-verktøyet\n- Finn nummeret (bruk nettsøk om nødvendig), bekreft med brukeren, og si "Jeg kobler deg nå" rett før du kobler`;
+    }
     if (callerName || callerNumber) {
       const parts = [];
       if (callerName) parts.push(`Navn: ${callerName}`);
@@ -122,6 +141,12 @@ class Brain {
     }
   }
 
+  _getTools() {
+    const tools = [WEB_SEARCH_TOOL];
+    if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
+    return tools;
+  }
+
   async respond(userText) {
     this.messages.push({ role: 'user', content: userText });
 
@@ -133,7 +158,7 @@ class Brain {
         max_tokens: 1024,
         system: this.systemPrompt,
         messages: this.messages,
-        tools: [WEB_SEARCH_TOOL],
+        tools: this._getTools(),
       });
 
       const chunks = [];
@@ -159,6 +184,9 @@ class Brain {
 
     let fullResponse = '';
     let sentenceBuffer = '';
+    let toolName = null;
+    let toolInput = '';
+    let inToolUse = false;
 
     try {
       const stream = this.client.messages.stream({
@@ -166,11 +194,19 @@ class Brain {
         max_tokens: 1024,
         system: this.systemPrompt,
         messages: this.messages,
-        tools: [WEB_SEARCH_TOOL],
+        tools: this._getTools(),
       });
 
       for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta?.text) {
+        if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+          toolName = event.content_block.name;
+          toolInput = '';
+          inToolUse = true;
+        } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+          toolInput += event.delta.partial_json;
+        } else if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
+          inToolUse = false;
+        } else if (event.type === 'content_block_delta' && event.delta?.text) {
           sentenceBuffer += event.delta.text;
           fullResponse += event.delta.text;
 
@@ -193,6 +229,18 @@ class Brain {
     }
 
     this.messages.push({ role: 'assistant', content: fullResponse });
+
+    // If make_call tool was used, yield the tool action
+    if (toolName === 'make_call' && toolInput) {
+      try {
+        const parsed = JSON.parse(toolInput);
+        if (parsed.phone_number) {
+          yield { type: 'make_call', phoneNumber: parsed.phone_number };
+        }
+      } catch (e) {
+        console.error('[Brain] Failed to parse make_call input:', e.message);
+      }
+    }
   }
 
   reset() {

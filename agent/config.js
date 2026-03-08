@@ -31,4 +31,8 @@ module.exports = {
   ECHO_MODE: !!process.env.ECHO_MODE,
   NOTIFY_EMAIL: process.env.NOTIFY_EMAIL || '',
   NOTIFY_EMAIL_PASSWORD: process.env.NOTIFY_EMAIL_PASSWORD || '',
+  AMI_HOST: process.env.AMI_HOST || '127.0.0.1',
+  AMI_PORT: parseInt(process.env.AMI_PORT || '5038', 10),
+  AMI_USER: process.env.AMI_USER || 'agent',
+  AMI_SECRET: process.env.AMI_SECRET || 'agent_secret',
 };

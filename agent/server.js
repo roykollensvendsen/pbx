@@ -8,6 +8,7 @@ const { DeepgramSTT } = require('./stt');
 const { Brain } = require('./brain');
 const { ElevenLabsTTS } = require('./tts');
 const { sendCallSummary, sendApiAlert } = require('./notify');
+const { redirectChannel } = require('./ami');
 
 function handleConnection(socket) {
   const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
@@ -24,14 +25,16 @@ function handleConnection(socket) {
   let destroyed = false;
   let callerNumber = null;
   let callerName = null;
+  let callerChannel = null;
 
   function readCallerID() {
     try {
       const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
-      const [num, name] = raw.split('|');
-      callerNumber = num || null;
-      callerName = (name && name !== callerNumber) ? name : null;
-      console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'})`);
+      const parts = raw.split('|');
+      callerNumber = parts[0] || null;
+      callerName = (parts[1] && parts[1] !== callerNumber) ? parts[1] : null;
+      callerChannel = parts[2] || null;
+      console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'}) channel=${callerChannel || 'unknown'}`);
       // Remove file (may fail if owned by root — that's OK)
       try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
       return true;
@@ -163,6 +166,18 @@ function handleConnection(socket) {
 
   stt.on('error', (err) => console.error('[STT] Error:', err.message));
 
+  function waitForPlaybackDrain() {
+    return new Promise((resolve) => {
+      if (playbackQueue.length === 0) return resolve();
+      const check = setInterval(() => {
+        if (playbackQueue.length === 0 || destroyed) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
   async function handleUtterance(text) {
     if (processing || destroyed) return;
     processing = true;
@@ -170,10 +185,25 @@ function handleConnection(socket) {
 
     try {
       // Collect sentence chunks from Claude and speak them one at a time
-      for await (const sentence of brain.respondStreaming(text)) {
+      for await (const chunk of brain.respondStreaming(text)) {
         if (destroyed) break;
-        console.log(`[Brain] Sentence: "${sentence}"`);
-        await speakSentence(sentence);
+
+        // Check if this is a tool action rather than text
+        if (chunk && typeof chunk === 'object' && chunk.type === 'make_call') {
+          console.log(`[Server] make_call requested: ${chunk.phoneNumber}`);
+          await waitForPlaybackDrain();
+          try {
+            await redirectChannel(callerChannel, 'outbound-agent', chunk.phoneNumber);
+            console.log(`[Server] Call redirected to ${chunk.phoneNumber}`);
+          } catch (err) {
+            console.error(`[Server] Redirect failed: ${err.message}`);
+            await speakSentence('Beklager, jeg klarte ikke å koble samtalen.');
+          }
+          break;
+        }
+
+        console.log(`[Brain] Sentence: "${chunk}"`);
+        await speakSentence(chunk);
       }
     } catch (err) {
       console.error('[Brain] Error:', err.message);
@@ -245,12 +275,14 @@ function handleConnection(socket) {
       // Re-read caller ID in case it wasn't available at connect time
       if (!callerNumber) readCallerID();
       // Now create Brain with caller info (init fetches time/weather)
-      brain = new Brain(callerNumber, callerName);
+      const canMakeCall = callerChannel && callerChannel.startsWith('PJSIP/');
+      brain = new Brain(callerNumber, callerName, canMakeCall);
       await brain.init();
       processing = true;
+      const callNote = canMakeCall ? ', ringe noen for deg' : '';
       const greeting = callerName
-        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været, eller fortelle en vits.`
-        : 'Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været, eller fortelle en vits.';
+        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}, eller fortelle en vits.`
+        : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}, eller fortelle en vits.`;
       console.log(`[Brain] Greeting: "${greeting}"`);
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
