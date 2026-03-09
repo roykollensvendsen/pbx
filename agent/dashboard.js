@@ -133,7 +133,7 @@ async function loadCalls() {
     }
     let html = '';
     for (const call of data) {
-      html += '<div class="call"><div class="call-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">'
+      html += '<div class="call"><div class="call-header" onclick="this.nextElementSibling.classList.toggle(&quot;open&quot;)">'
         + '<div><span class="call-name">' + escapeHtml(call.callerName) + '</span> <span class="call-number">' + escapeHtml(call.callerNumber) + '</span></div>'
         + '<span class="call-time">' + escapeHtml(call.timestamp) + '</span>'
         + '</div><div class="call-details"><div class="transcript">';
