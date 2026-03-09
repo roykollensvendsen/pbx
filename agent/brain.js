@@ -149,15 +149,19 @@ async function fetchWeather() {
 }
 
 class Brain {
-  constructor(callerNumber, callerName, canMakeCall, canTransfer) {
+  constructor(callerNumber, callerName, canMakeCall, canTransfer, callerExtension) {
     this.client = new Anthropic();
     this.messages = [];
     this.canMakeCall = canMakeCall || false;
     this.canTransfer = canTransfer || false;
+    this.callerExtension = callerExtension || null;
     this.systemPrompt = SYSTEM_PROMPT;
     if (this.canTransfer) {
       const lines = Object.entries(EXTENSION_DIRECTORY).map(([ext, name]) => `  ${ext}: ${name}`).join('\n');
       this.systemPrompt += `\n- Du kan sette innringeren over til en intern linje — bruk transfer_call-verktøyet\n- Tilgjengelige linjer:\n${lines}\n- Når brukeren ber om å ringe eller bli satt over til et sted som matcher en intern linje (f.eks. "ring kontoret", "sett meg over til stua"), bruk ALLTID transfer_call — IKKE make_call eller nettsøk`;
+      if (this.callerExtension && EXTENSION_DIRECTORY[this.callerExtension]) {
+        this.systemPrompt += `\n- Innringeren ringer fra linje ${this.callerExtension} (${EXTENSION_DIRECTORY[this.callerExtension]}). Hvis de ber om å bli satt over til sin egen linje, si at de allerede er der — IKKE bruk transfer_call`;
+      }
     }
     if (this.canMakeCall) {
       const contacts = loadContacts();

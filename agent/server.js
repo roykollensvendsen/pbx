@@ -297,7 +297,11 @@ function handleConnection(socket) {
       // Now create Brain with caller info (init fetches time/weather)
       const canMakeCall = callerChannel && callerChannel.startsWith('PJSIP/');
       const canTransfer = !!callerChannel;
-      brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer);
+      // Extract caller extension from PJSIP channel (e.g. "PJSIP/101-00000001" → "101")
+      const callerExtension = callerChannel && callerChannel.startsWith('PJSIP/')
+        ? callerChannel.split('/')[1].split('-')[0]
+        : null;
+      brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer, callerExtension);
       await brain.init();
       processing = true;
       const callNote = canMakeCall ? ', ringe noen for deg' : '';
