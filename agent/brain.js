@@ -386,15 +386,15 @@ class Brain {
         this.messages.push({ role: 'assistant', content: text });
       }
 
-      // Handle local tools (message tools) — execute and feed result back
-      const localTool = toolUses.find((t) => LOCAL_TOOLS.includes(t.name));
-      if (localTool) {
-        log.brain.info(`Tool: ${localTool.name}(${JSON.stringify(localTool.input)})`);
-        const result = this._executeLocalTool(localTool.name, localTool.input);
-        this.messages.push({
-          role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: localTool.id, content: result }],
+      // Handle local tools (message tools) — execute ALL and feed results back
+      const localTools = toolUses.filter((t) => LOCAL_TOOLS.includes(t.name));
+      if (localTools.length > 0) {
+        const results = localTools.map((tool) => {
+          log.brain.info(`Tool: ${tool.name}(${JSON.stringify(tool.input)})`);
+          const result = this._executeLocalTool(tool.name, tool.input);
+          return { type: 'tool_result', tool_use_id: tool.id, content: result };
         });
+        this.messages.push({ role: 'user', content: results });
         continue; // loop to get Claude's spoken response
       }
 
