@@ -121,4 +121,16 @@ function messageSummary() {
   return summary;
 }
 
-module.exports = { leaveMessage, checkMessages, deleteMessages, editMessage, sentMessages, messageSummary };
+function getAllMessages() {
+  const FAMILY = ['roy', 'cecile', 'lukas', 'alana'];
+  const result = {};
+  for (const name of FAMILY) {
+    const msgs = loadMessages(name);
+    if (msgs.length > 0) {
+      result[name] = msgs;
+    }
+  }
+  return result;
+}
+
+module.exports = { leaveMessage, checkMessages, deleteMessages, editMessage, sentMessages, messageSummary, getAllMessages };

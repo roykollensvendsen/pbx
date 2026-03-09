@@ -35,4 +35,5 @@ module.exports = {
   AMI_PORT: parseInt(process.env.AMI_PORT || '5038', 10),
   AMI_USER: process.env.AMI_USER || 'agent',
   AMI_SECRET: process.env.AMI_SECRET || 'agent_secret',
+  DASHBOARD_PORT: parseInt(process.env.DASHBOARD_PORT || '8080', 10),
 };

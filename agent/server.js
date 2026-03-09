@@ -11,6 +11,8 @@ const { sendCallSummary, sendApiAlert } = require('./notify');
 const path = require('path');
 const { redirectChannel } = require('./ami');
 const log = require('./log');
+const { logCall } = require('./calls');
+require('./dashboard');
 
 // Build reverse lookup: normalized phone number → contact name
 function loadContactsByNumber() {
@@ -136,6 +138,22 @@ function handleConnection(socket) {
     // Send email notification if agent answered (even if caller said nothing)
     if (brain && brain.messages.length > 0) {
       sendCallSummary(brain.messages, callerNumber, callerName);
+      // Log call for dashboard
+      const actions = brain.messages
+        .filter(m => m.role === 'assistant' && typeof m.content === 'string')
+        .flatMap(m => {
+          const acts = [];
+          if (/sette deg over|transfer/i.test(m.content)) acts.push('transfer_call');
+          if (/koble samtalen|make_call/i.test(m.content)) acts.push('make_call');
+          return acts;
+        });
+      logCall({
+        callerNumber,
+        callerName,
+        timestamp: new Date().toLocaleString('no-NO', { timeZone: 'Europe/Oslo' }),
+        messages: brain.messages.filter(m => m.role === 'user' || m.role === 'assistant'),
+        actions,
+      });
     }
   }
 

@@ -23,6 +23,7 @@ const TAGS = {
   ami:     { icon: '📡', color: BLUE },
   notify:  { icon: '📧', color: WHITE },
   echo:    { icon: '🔁', color: DIM },
+  dashboard: { icon: '🌐', color: BRIGHT_CYAN },
 };
 
 function timestamp() {
@@ -57,4 +58,5 @@ module.exports = {
   ami: make('ami'),
   notify: make('notify'),
   echo: make('echo'),
+  dashboard: make('dashboard'),
 };
