@@ -9,10 +9,11 @@ const { Brain } = require('./brain');
 const { ElevenLabsTTS } = require('./tts');
 const { sendCallSummary, sendApiAlert } = require('./notify');
 const { redirectChannel } = require('./ami');
+const log = require('./log');
 
 function handleConnection(socket) {
   const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
-  console.log(`[Server] New connection from ${remoteAddr}`);
+  log.server.info(`New connection from ${remoteAddr}`);
 
   let uuid = null;
   let buffer = Buffer.alloc(0);
@@ -32,7 +33,7 @@ function handleConnection(socket) {
       const stat = fs.statSync('/tmp/agent-callerid');
       const ageMs = Date.now() - stat.mtimeMs;
       if (ageMs > 5000) {
-        console.log(`[Server] Ignoring stale callerid file (${Math.round(ageMs / 1000)}s old)`);
+        log.server.info(`Ignoring stale callerid file (${Math.round(ageMs / 1000)}s old)`);
         try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
         return false;
       }
@@ -41,7 +42,7 @@ function handleConnection(socket) {
       callerNumber = parts[0] || null;
       callerName = (parts[1] && parts[1] !== callerNumber) ? parts[1] : null;
       callerChannel = parts[2] || null;
-      console.log(`[Server] Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'}) channel=${callerChannel || 'unknown'}`);
+      log.server.info(`Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'}) channel=${callerChannel || 'unknown'}`);
       // Remove file (may fail if owned by root — that's OK)
       try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
       return true;
@@ -100,7 +101,7 @@ function handleConnection(socket) {
   function cleanup() {
     if (destroyed) return;
     destroyed = true;
-    console.log(`[Server] Cleaning up ${uuid || remoteAddr}`);
+    log.server.info(`Cleaning up ${uuid || remoteAddr}`);
     if (keepAliveTimer) clearInterval(keepAliveTimer);
     stopPlayback();
     if (stt) stt.stop();
@@ -113,7 +114,7 @@ function handleConnection(socket) {
 
   // --- Echo mode ---
   if (config.ECHO_MODE) {
-    console.log('[Server] Running in ECHO mode');
+    log.echo.info('Running in ECHO mode');
 
     socket.on('data', (data) => {
       buffer = Buffer.concat([buffer, data]);
@@ -125,21 +126,21 @@ function handleConnection(socket) {
 
         if (frame.type === TYPE_UUID) {
           uuid = formatUUID(frame.payload);
-          console.log(`[Echo] UUID: ${uuid}`);
+          log.echo.info(`UUID: ${uuid}`);
         } else if (frame.type === TYPE_AUDIO) {
           // Echo audio back immediately
           if (!socket.destroyed) {
             socket.write(encodeAudio(frame.payload));
           }
         } else if (frame.type === TYPE_TERMINATE) {
-          console.log('[Echo] Received terminate');
+          log.echo.info('Received terminate');
           socket.end();
         }
       }
     });
 
-    socket.on('close', () => console.log(`[Echo] Connection closed: ${uuid || remoteAddr}`));
-    socket.on('error', (err) => console.error(`[Echo] Error: ${err.message}`));
+    socket.on('close', () => log.echo.info(`Connection closed: ${uuid || remoteAddr}`));
+    socket.on('error', (err) => log.echo.error(err.message));
     return;
   }
 
@@ -152,26 +153,26 @@ function handleConnection(socket) {
   stt.on('transcript', ({ text, isFinal, speechFinal }) => {
     if (isFinal) {
       utteranceText += (utteranceText ? ' ' : '') + text;
-      console.log(`[STT] Final: "${text}" (accumulated: "${utteranceText}")`);
+      log.stt.info(`Final: "${text}" (accumulated: "${utteranceText}")`);
 
       if (speechFinal && utteranceText.trim()) {
         handleUtterance(utteranceText.trim());
         utteranceText = '';
       }
     } else {
-      console.log(`[STT] Interim: "${text}"`);
+      log.stt.info(`Interim: "${text}"`);
     }
   });
 
   stt.on('utterance_end', () => {
     if (utteranceText.trim() && !processing) {
-      console.log(`[STT] Utterance end, processing: "${utteranceText}"`);
+      log.stt.info(`Utterance end, processing: "${utteranceText}"`);
       handleUtterance(utteranceText.trim());
       utteranceText = '';
     }
   });
 
-  stt.on('error', (err) => console.error('[STT] Error:', err.message));
+  stt.on('error', (err) => log.stt.error(err.message));
 
   function waitForPlaybackDrain() {
     return new Promise((resolve) => {
@@ -188,7 +189,7 @@ function handleConnection(socket) {
   async function handleUtterance(text) {
     if (processing || destroyed) return;
     processing = true;
-    console.log(`[Brain] User said: "${text}"`);
+    log.brain.userSaid(text);
 
     try {
       // Collect sentence chunks from Claude and speak them one at a time
@@ -197,36 +198,36 @@ function handleConnection(socket) {
 
         // Check if this is a tool action rather than text
         if (chunk && typeof chunk === 'object' && chunk.type === 'make_call') {
-          console.log(`[Server] make_call requested: ${chunk.phoneNumber}`);
+          log.server.action(`make_call → ${chunk.phoneNumber}`);
           await waitForPlaybackDrain();
           try {
             await redirectChannel(callerChannel, 'outbound-agent', chunk.phoneNumber);
-            console.log(`[Server] Call redirected to ${chunk.phoneNumber}`);
+            log.server.action(`Call redirected to ${chunk.phoneNumber}`);
           } catch (err) {
-            console.error(`[Server] Redirect failed: ${err.message}`);
+            log.server.error(`Redirect failed: ${err.message}`);
             await speakSentence('Beklager, jeg klarte ikke å koble samtalen.');
           }
           break;
         }
 
         if (chunk && typeof chunk === 'object' && chunk.type === 'transfer_call') {
-          console.log(`[Server] transfer_call requested: ext ${chunk.extension}`);
+          log.server.action(`transfer_call → ext ${chunk.extension}`);
           await waitForPlaybackDrain();
           try {
             await redirectChannel(callerChannel, 'transfer-agent', chunk.extension);
-            console.log(`[Server] Call transferred to ext ${chunk.extension}`);
+            log.server.action(`Call transferred to ext ${chunk.extension}`);
           } catch (err) {
-            console.error(`[Server] Transfer failed: ${err.message}`);
+            log.server.error(`Transfer failed: ${err.message}`);
             await speakSentence('Beklager, jeg klarte ikke å sette deg over.');
           }
           break;
         }
 
-        console.log(`[Brain] Sentence: "${chunk}"`);
+        log.brain.aiSay(chunk);
         await speakSentence(chunk);
       }
     } catch (err) {
-      console.error('[Brain] Error:', err.message);
+      log.brain.error(err.message);
     } finally {
       processing = false;
       ttsPlaying = false;
@@ -288,7 +289,7 @@ function handleConnection(socket) {
 
   // Send initial greeting after a short delay
   stt.on('ready', () => {
-    console.log('[Server] Pipeline ready, sending greeting');
+    log.server.info('Pipeline ready, sending greeting');
     // Delay to let caller ID file be written and call settle
     setTimeout(async () => {
       if (destroyed) return;
@@ -307,7 +308,7 @@ function handleConnection(socket) {
         fs.accessSync('/tmp/agent-return');
         returnFromTransfer = true;
         try { fs.unlinkSync('/tmp/agent-return'); } catch (e) {}
-        console.log('[Server] Caller returning from unanswered transfer');
+        log.server.info('Caller returning from unanswered transfer');
       } catch (e) {}
 
       brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer, callerExtension);
@@ -324,7 +325,7 @@ function handleConnection(socket) {
           ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`
           : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`;
       }
-      console.log(`[Brain] Greeting: "${greeting}"`);
+      log.brain.aiSay(greeting);
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
       processing = false;
@@ -342,14 +343,14 @@ function handleConnection(socket) {
 
       if (frame.type === TYPE_UUID) {
         uuid = formatUUID(frame.payload);
-        console.log(`[Server] UUID: ${uuid}`);
+        log.server.info(`UUID: ${uuid}`);
       } else if (frame.type === TYPE_AUDIO) {
         // Don't send audio to STT while TTS is playing (prevents self-hearing)
         if (!ttsPlaying) {
           stt.send(frame.payload);
         }
       } else if (frame.type === TYPE_TERMINATE) {
-        console.log('[Server] Received terminate — caller hung up');
+        log.server.info('Received terminate — caller hung up');
         cleanup();
         socket.end();
       }
@@ -357,12 +358,12 @@ function handleConnection(socket) {
   });
 
   socket.on('close', () => {
-    console.log(`[Server] Connection closed: ${uuid || remoteAddr}`);
+    log.server.info(`Connection closed: ${uuid || remoteAddr}`);
     cleanup();
   });
 
   socket.on('error', (err) => {
-    console.error(`[Server] Socket error: ${err.message}`);
+    log.server.error(`Socket error: ${err.message}`);
     sendApiAlert('AudioSocket', err);
     cleanup();
   });
@@ -372,10 +373,10 @@ const server = net.createServer(handleConnection);
 
 server.listen(config.AGENT_PORT, '127.0.0.1', () => {
   const mode = config.ECHO_MODE ? 'ECHO' : 'AI';
-  console.log(`[Server] AudioSocket server (${mode} mode) listening on 127.0.0.1:${config.AGENT_PORT}`);
+  log.server.info(`AudioSocket server (${mode} mode) listening on 127.0.0.1:${config.AGENT_PORT}`);
 });
 
 server.on('error', (err) => {
-  console.error('[Server] Fatal error:', err.message);
+  log.server.error(`Fatal: ${err.message}`);
   process.exit(1);
 });

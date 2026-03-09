@@ -2,6 +2,7 @@
 
 const net = require('net');
 const config = require('./config');
+const log = require('./log');
 
 function sendAction(action) {
   return new Promise((resolve, reject) => {
@@ -112,7 +113,7 @@ async function redirectWithLogin(channel, context, exten) {
           const msgMatch = response.match(/Message: (.+)/);
           reject(new Error(`AMI Redirect error: ${msgMatch ? msgMatch[1].trim() : 'unknown'}`));
         } else {
-          console.log(`[AMI] Redirected ${channel} → ${context}/${exten}`);
+          log.ami.info(`Redirected ${channel} → ${context}/${exten}`);
           resolve();
         }
       }

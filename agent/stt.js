@@ -4,6 +4,7 @@ const { EventEmitter } = require('events');
 const WebSocket = require('ws');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
+const log = require('./log');
 
 class DeepgramSTT extends EventEmitter {
   constructor() {
@@ -32,7 +33,7 @@ class DeepgramSTT extends EventEmitter {
 
     this.ws.on('open', () => {
       this.ready = true;
-      console.log('[STT] Deepgram connected');
+      log.stt.info('Deepgram connected');
       this.emit('ready');
     });
 
@@ -52,19 +53,19 @@ class DeepgramSTT extends EventEmitter {
           this.emit('utterance_end');
         }
       } catch (err) {
-        console.error('[STT] Parse error:', err.message);
+        log.stt.error(`Parse error: ${err.message}`);
       }
     });
 
     this.ws.on('error', (err) => {
-      console.error('[STT] WebSocket error:', err.message);
+      log.stt.error(`WebSocket error: ${err.message}`);
       sendApiAlert('Deepgram STT', err);
       this.emit('error', err);
     });
 
     this.ws.on('close', (code, reason) => {
       this.ready = false;
-      console.log(`[STT] Closed: ${code} ${reason}`);
+      log.stt.info(`Closed: ${code} ${reason}`);
       if (code !== 1000 && code !== 1001 && code !== 1005) {
         sendApiAlert('Deepgram STT', `WebSocket closed unexpectedly: ${code} ${reason}`);
       }

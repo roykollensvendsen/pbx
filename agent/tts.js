@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const config = require('./config');
 const { resample } = require('./resampler');
 const { sendApiAlert } = require('./notify');
+const log = require('./log');
 
 const ELEVENLABS_WS_URL = 'wss://api.elevenlabs.io/v1/text-to-speech';
 // ElevenLabs PCM output sample rate
@@ -32,13 +33,13 @@ class ElevenLabsTTS extends EventEmitter {
       });
 
       const url = `${ELEVENLABS_WS_URL}/${voiceId}/stream-input?${params}`;
-      console.log(`[TTS] Connecting to ElevenLabs (voice: ${voiceId}, model: ${model})`);
+      log.tts.info(`Connecting to ElevenLabs (voice: ${voiceId}, model: ${model})`);
       this.ws = new WebSocket(url);
       this.aborted = false;
 
       this.ws.on('open', () => {
         this.ready = true;
-        console.log('[TTS] WebSocket connected, sending text');
+        log.tts.info('WebSocket connected, sending text');
         // Send BOS (beginning of stream) with voice settings
         this.ws.send(JSON.stringify({
           text: ' ',
@@ -61,34 +62,34 @@ class ElevenLabsTTS extends EventEmitter {
         try {
           const msg = JSON.parse(data);
           if (msg.error) {
-            console.error('[TTS] API error:', msg.error, msg.message || '');
+            log.tts.error(`API error: ${msg.error} ${msg.message || ''}`);
             sendApiAlert('ElevenLabs TTS', `${msg.error}: ${msg.message || ''}`);
             return;
           }
           if (msg.audio) {
             const pcm = Buffer.from(msg.audio, 'base64');
-            console.log(`[TTS] Audio chunk: ${pcm.length} bytes`);
+            log.tts.info(`Audio chunk: ${pcm.length} bytes`);
             const resampled = resample(pcm, TTS_SAMPLE_RATE, TARGET_SAMPLE_RATE);
             this.emit('audio', resampled);
           }
           if (msg.isFinal) {
-            console.log('[TTS] Stream complete');
+            log.tts.info('Stream complete');
             this.emit('done');
           }
         } catch (err) {
-          console.error('[TTS] Parse error:', err.message);
+          log.tts.error(`Parse error: ${err.message}`);
         }
       });
 
       this.ws.on('error', (err) => {
-        console.error('[TTS] WebSocket error:', err.message);
+        log.tts.error(`WebSocket error: ${err.message}`);
         sendApiAlert('ElevenLabs TTS', err);
         this.emit('error', err);
         reject(err);
       });
 
       this.ws.on('close', (code, reason) => {
-        console.log(`[TTS] WebSocket closed: ${code} ${reason}`);
+        log.tts.info(`WebSocket closed: ${code} ${reason}`);
         this.ready = false;
         this.ws = null;
         resolve();

@@ -5,13 +5,14 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
+const log = require('./log');
 
 function loadContacts() {
   try {
     const raw = fs.readFileSync(path.join(__dirname, 'contacts.json'), 'utf8');
     return JSON.parse(raw);
   } catch (e) {
-    console.error('[Brain] Failed to load contacts.json:', e.message);
+    log.brain.error(`Failed to load contacts.json: ${e.message}`);
     return {};
   }
 }
@@ -140,10 +141,10 @@ async function fetchWeather() {
     const baseSymbol = symbolCode.replace(/_(day|night|polartwilight)$/, '');
     const description = WEATHER_SYMBOLS[baseSymbol] || baseSymbol;
     const result = `Tvedestrand: ${description}, ${temp} grader`;
-    console.log(`[Brain] Weather: ${result}`);
+    log.brain.info(`Weather: ${result}`);
     return result;
   } catch (err) {
-    console.error(`[Brain] Failed to fetch weather: ${err.message}`);
+    log.brain.error(`Failed to fetch weather: ${err.message}`);
     return null;
   }
 }
@@ -289,7 +290,7 @@ class Brain {
           yield { type: 'make_call', phoneNumber: parsed.phone_number };
         }
       } catch (e) {
-        console.error('[Brain] Failed to parse make_call input:', e.message);
+        log.brain.error(`Failed to parse make_call input: ${e.message}`);
       }
     } else if (toolName === 'transfer_call' && toolInput) {
       try {
@@ -298,7 +299,7 @@ class Brain {
           yield { type: 'transfer_call', extension: parsed.extension };
         }
       } catch (e) {
-        console.error('[Brain] Failed to parse transfer_call input:', e.message);
+        log.brain.error(`Failed to parse transfer_call input: ${e.message}`);
       }
     }
   }
