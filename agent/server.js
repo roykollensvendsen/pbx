@@ -209,6 +209,19 @@ function handleConnection(socket) {
           break;
         }
 
+        if (chunk && typeof chunk === 'object' && chunk.type === 'transfer_call') {
+          console.log(`[Server] transfer_call requested: ext ${chunk.extension}`);
+          await waitForPlaybackDrain();
+          try {
+            await redirectChannel(callerChannel, 'transfer-agent', chunk.extension);
+            console.log(`[Server] Call transferred to ext ${chunk.extension}`);
+          } catch (err) {
+            console.error(`[Server] Transfer failed: ${err.message}`);
+            await speakSentence('Beklager, jeg klarte ikke å sette deg over.');
+          }
+          break;
+        }
+
         console.log(`[Brain] Sentence: "${chunk}"`);
         await speakSentence(chunk);
       }
@@ -283,13 +296,15 @@ function handleConnection(socket) {
       if (!callerNumber) readCallerID();
       // Now create Brain with caller info (init fetches time/weather)
       const canMakeCall = callerChannel && callerChannel.startsWith('PJSIP/');
-      brain = new Brain(callerNumber, callerName, canMakeCall);
+      const canTransfer = !!callerChannel;
+      brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer);
       await brain.init();
       processing = true;
       const callNote = canMakeCall ? ', ringe noen for deg' : '';
+      const transferNote = canTransfer ? ', sette deg over til en intern linje' : '';
       const greeting = callerName
-        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}, eller fortelle en vits.`
-        : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}, eller fortelle en vits.`;
+        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`
+        : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`;
       console.log(`[Brain] Greeting: "${greeting}"`);
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);

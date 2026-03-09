@@ -56,6 +56,28 @@ const MAKE_CALL_TOOL = {
   },
 };
 
+const TRANSFER_CALL_TOOL = {
+  name: 'transfer_call',
+  description: 'Overfør innringeren til en intern linje. Si "Jeg setter deg over nå" rett før du bruker dette verktøyet.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      extension: {
+        type: 'string',
+        description: 'Internnummeret (f.eks. "101")',
+        enum: ['101', '102', '103'],
+      },
+    },
+    required: ['extension'],
+  },
+};
+
+const EXTENSION_DIRECTORY = {
+  '101': 'Kontor',
+  '102': 'Stue',
+  '103': 'Garasje',
+};
+
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
 
@@ -127,11 +149,16 @@ async function fetchWeather() {
 }
 
 class Brain {
-  constructor(callerNumber, callerName, canMakeCall) {
+  constructor(callerNumber, callerName, canMakeCall, canTransfer) {
     this.client = new Anthropic();
     this.messages = [];
     this.canMakeCall = canMakeCall || false;
+    this.canTransfer = canTransfer || false;
     this.systemPrompt = SYSTEM_PROMPT;
+    if (this.canTransfer) {
+      const lines = Object.entries(EXTENSION_DIRECTORY).map(([ext, name]) => `  ${ext}: ${name}`).join('\n');
+      this.systemPrompt += `\n- Du kan sette innringeren over til en intern linje — bruk transfer_call-verktøyet\n- Tilgjengelige linjer:\n${lines}\n- Når brukeren ber om å ringe eller bli satt over til et sted som matcher en intern linje (f.eks. "ring kontoret", "sett meg over til stua"), bruk ALLTID transfer_call — IKKE make_call eller nettsøk`;
+    }
     if (this.canMakeCall) {
       const contacts = loadContacts();
       const contactEntries = Object.entries(contacts);
@@ -163,6 +190,7 @@ class Brain {
   _getTools() {
     const tools = [WEB_SEARCH_TOOL];
     if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
+    if (this.canTransfer) tools.push(TRANSFER_CALL_TOOL);
     return tools;
   }
 
@@ -249,7 +277,7 @@ class Brain {
 
     this.messages.push({ role: 'assistant', content: fullResponse });
 
-    // If make_call tool was used, yield the tool action
+    // If a tool was used, yield the tool action
     if (toolName === 'make_call' && toolInput) {
       try {
         const parsed = JSON.parse(toolInput);
@@ -258,6 +286,15 @@ class Brain {
         }
       } catch (e) {
         console.error('[Brain] Failed to parse make_call input:', e.message);
+      }
+    } else if (toolName === 'transfer_call' && toolInput) {
+      try {
+        const parsed = JSON.parse(toolInput);
+        if (parsed.extension) {
+          yield { type: 'transfer_call', extension: parsed.extension };
+        }
+      } catch (e) {
+        console.error('[Brain] Failed to parse transfer_call input:', e.message);
       }
     }
   }
