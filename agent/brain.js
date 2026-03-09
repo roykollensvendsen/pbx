@@ -6,7 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
 const log = require('./log');
-const { leaveMessage, checkMessages, deleteMessages } = require('./messages');
+const { leaveMessage, checkMessages, deleteMessages, messageSummary } = require('./messages');
 
 function loadContacts() {
   try {
@@ -134,7 +134,16 @@ const DELETE_MESSAGES_TOOL = {
   },
 };
 
-const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages'];
+const MESSAGE_SUMMARY_TOOL = {
+  name: 'message_summary',
+  description: 'Vis en oversikt over hvilke familiemedlemmer som har beskjeder og hvor mange.',
+  input_schema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
+const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages', 'message_summary'];
 
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
@@ -250,7 +259,7 @@ class Brain {
   }
 
   _getTools() {
-    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL];
+    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL, MESSAGE_SUMMARY_TOOL];
     if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
     if (this.canTransfer) tools.push(TRANSFER_CALL_TOOL);
     return tools;
@@ -269,6 +278,11 @@ class Brain {
     if (name === 'delete_messages') {
       const count = deleteMessages(input.recipient, input.which || 'heard');
       return JSON.stringify({ deleted: count });
+    }
+    if (name === 'message_summary') {
+      const summary = messageSummary();
+      if (Object.keys(summary).length === 0) return JSON.stringify({ summary: 'Ingen beskjeder til noen.' });
+      return JSON.stringify(summary);
     }
     return JSON.stringify({ error: 'Unknown tool' });
   }

@@ -84,4 +84,17 @@ function deleteMessages(recipient, messageIds) {
   return deleted;
 }
 
-module.exports = { leaveMessage, checkMessages, deleteMessages };
+function messageSummary() {
+  const FAMILY = ['roy', 'cecile', 'lukas', 'alana'];
+  const summary = {};
+  for (const name of FAMILY) {
+    const msgs = loadMessages(name);
+    if (msgs.length > 0) {
+      const unheard = msgs.filter((m) => !m.heard).length;
+      summary[name] = { total: msgs.length, unheard };
+    }
+  }
+  return summary;
+}
+
+module.exports = { leaveMessage, checkMessages, deleteMessages, messageSummary };
