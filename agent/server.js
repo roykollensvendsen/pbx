@@ -322,11 +322,10 @@ function handleConnection(socket) {
       if (returnFromTransfer) {
         greeting = 'Det var dessverre ingen som svarte. Er det noe annet jeg kan hjelpe deg med?';
       } else {
-        const callNote = canMakeCall ? ', ringe noen for deg' : '';
-        const transferNote = canTransfer ? ', sette deg over til en intern linje' : '';
-        greeting = callerName
-          ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`
-          : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`;
+        // Only greet by name if it looks like an actual person name (not "Ext 101" etc)
+        const isPersonName = callerName && !/^(ext|sip|pjsip|\d)/i.test(callerName);
+        const nameGreeting = isPersonName ? ` ${callerName}` : '';
+        greeting = `Hei${nameGreeting}, dette er AI-assistenten til familien Kollensvendsen. Hva kan jeg hjelpe deg med?`;
       }
       log.brain.aiSay(greeting);
       brain.messages.push({ role: 'assistant', content: greeting });
