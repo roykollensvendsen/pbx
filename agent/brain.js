@@ -17,7 +17,7 @@ function loadContacts() {
   }
 }
 
-const SYSTEM_PROMPT = `Du er en hyggelig AI-assistent som svarer telefonen for familien Kollensvendsen.
+const SYSTEM_PROMPT = `Du er en hyggelig AI-assistent som svarer telefonen for familien Svendsen.
 
 Familiemedlemmer:
 - Roy (pappa)
