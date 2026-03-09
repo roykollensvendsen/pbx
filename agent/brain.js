@@ -123,20 +123,14 @@ const CHECK_MESSAGES_TOOL = {
 
 const DELETE_MESSAGES_TOOL = {
   name: 'delete_messages',
-  description: 'Slett beskjeder for et familiemedlem.',
+  description: 'Slett beskjeder for et familiemedlem. Bruk "heard" for å slette alle hørte, eller "all" for å slette alle.',
   input_schema: {
     type: 'object',
     properties: {
       recipient: { type: 'string', description: 'Hvem du sletter beskjeder for' },
-      message_ids: {
-        description: 'ID-er å slette, eller "heard" for alle hørte, eller "all" for alle',
-        oneOf: [
-          { type: 'array', items: { type: 'string' } },
-          { type: 'string', enum: ['heard', 'all'] },
-        ],
-      },
+      which: { type: 'string', description: '"heard" for hørte beskjeder, "all" for alle' },
     },
-    required: ['recipient', 'message_ids'],
+    required: ['recipient', 'which'],
   },
 };
 
@@ -273,7 +267,7 @@ class Brain {
       return JSON.stringify({ messages: msgs });
     }
     if (name === 'delete_messages') {
-      const count = deleteMessages(input.recipient, input.message_ids);
+      const count = deleteMessages(input.recipient, input.which || 'heard');
       return JSON.stringify({ deleted: count });
     }
     return JSON.stringify({ error: 'Unknown tool' });
