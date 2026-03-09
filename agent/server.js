@@ -301,14 +301,29 @@ function handleConnection(socket) {
       const callerExtension = callerChannel && callerChannel.startsWith('PJSIP/')
         ? callerChannel.split('/')[1].split('-')[0]
         : null;
+      // Check if this is a return from an unanswered transfer
+      let returnFromTransfer = false;
+      try {
+        fs.accessSync('/tmp/agent-return');
+        returnFromTransfer = true;
+        try { fs.unlinkSync('/tmp/agent-return'); } catch (e) {}
+        console.log('[Server] Caller returning from unanswered transfer');
+      } catch (e) {}
+
       brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer, callerExtension);
       await brain.init();
       processing = true;
-      const callNote = canMakeCall ? ', ringe noen for deg' : '';
-      const transferNote = canTransfer ? ', sette deg over til en intern linje' : '';
-      const greeting = callerName
-        ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`
-        : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`;
+
+      let greeting;
+      if (returnFromTransfer) {
+        greeting = 'Det var dessverre ingen som svarte. Er det noe annet jeg kan hjelpe deg med?';
+      } else {
+        const callNote = canMakeCall ? ', ringe noen for deg' : '';
+        const transferNote = canTransfer ? ', sette deg over til en intern linje' : '';
+        greeting = callerName
+          ? `Hei ${callerName}, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`
+          : `Hei, du har ringt Roy. Han er ikke tilgjengelig akkurat nå. Jeg kan ta imot en beskjed, svare på spørsmål om klokka og været${callNote}${transferNote}, eller fortelle en vits.`;
+      }
       console.log(`[Brain] Greeting: "${greeting}"`);
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
