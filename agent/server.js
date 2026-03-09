@@ -51,9 +51,6 @@ function handleConnection(socket) {
     }
   }
 
-  // Clean up stale transfer-return marker from previous sessions
-  try { fs.unlinkSync('/tmp/agent-return'); } catch (e) {}
-
   // Try reading caller ID — retry a few times since Asterisk writes it just before Dial()
   readCallerID();
 
@@ -306,12 +303,15 @@ function handleConnection(socket) {
         ? callerChannel.split('/')[1].split('-')[0]
         : null;
       // Check if this is a return from an unanswered transfer
+      // File is owned by Asterisk so we can't unlink it on sticky-bit /tmp — check age instead
       let returnFromTransfer = false;
       try {
-        fs.accessSync('/tmp/agent-return');
-        returnFromTransfer = true;
-        try { fs.unlinkSync('/tmp/agent-return'); } catch (e) {}
-        log.server.info('Caller returning from unanswered transfer');
+        const stat = fs.statSync('/tmp/agent-return');
+        const ageMs = Date.now() - stat.mtimeMs;
+        if (ageMs < 5000) {
+          returnFromTransfer = true;
+          log.server.info('Caller returning from unanswered transfer');
+        }
       } catch (e) {}
 
       brain = new Brain(callerNumber, callerName, canMakeCall, canTransfer, callerExtension);
