@@ -51,6 +51,9 @@ function handleConnection(socket) {
     }
   }
 
+  // Clean up stale transfer-return marker from previous sessions
+  try { fs.unlinkSync('/tmp/agent-return'); } catch (e) {}
+
   // Try reading caller ID — retry a few times since Asterisk writes it just before Dial()
   readCallerID();
 
