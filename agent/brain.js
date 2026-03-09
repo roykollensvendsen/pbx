@@ -6,6 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
 const log = require('./log');
+const { leaveMessage, checkMessages, deleteMessages } = require('./messages');
 
 function loadContacts() {
   try {
@@ -39,8 +40,10 @@ Viktige regler:
 - Snakk alltid på norsk
 - Vær kort og konsis — dette er en telefonsamtale, ikke en chat
 - Hold svarene korte (1-3 setninger maks)
-- Tilby å ta imot en beskjed
-- Hvis noen vil legge igjen en beskjed, spør om navn, telefonnummer, og hva det gjelder
+- Du kan ta imot beskjeder til familiemedlemmer — bruk leave_message-verktøyet
+- Familiemedlemmer kan spørre om det er beskjeder til dem — bruk check_messages
+- Familiemedlemmer kan slette beskjeder — bruk delete_messages
+- Når noen legger igjen en beskjed, spør hvem den er til, hvem den er fra (hvis ukjent), og hva det gjelder
 - Vær høflig og vennlig, men effektiv
 - Ikke bruk markdown, emojis, eller spesialtegn — dette leses opp som tale
 - Unngå lange pauser i setningene
@@ -91,6 +94,53 @@ const EXTENSION_DIRECTORY = {
   '102': 'Stue',
   '103': 'Garasje',
 };
+
+const LEAVE_MESSAGE_TOOL = {
+  name: 'leave_message',
+  description: 'Legg igjen en beskjed til et familiemedlem.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      recipient: { type: 'string', description: 'Hvem beskjeden er til (f.eks. "Roy", "Cecile")' },
+      from: { type: 'string', description: 'Hvem beskjeden er fra' },
+      message: { type: 'string', description: 'Selve beskjeden' },
+    },
+    required: ['recipient', 'from', 'message'],
+  },
+};
+
+const CHECK_MESSAGES_TOOL = {
+  name: 'check_messages',
+  description: 'Sjekk om det finnes beskjeder til et familiemedlem. Meldingene markeres automatisk som hørt.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      recipient: { type: 'string', description: 'Hvem du sjekker beskjeder for (f.eks. "Roy")' },
+    },
+    required: ['recipient'],
+  },
+};
+
+const DELETE_MESSAGES_TOOL = {
+  name: 'delete_messages',
+  description: 'Slett beskjeder for et familiemedlem.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      recipient: { type: 'string', description: 'Hvem du sletter beskjeder for' },
+      message_ids: {
+        description: 'ID-er å slette, eller "heard" for alle hørte, eller "all" for alle',
+        oneOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'string', enum: ['heard', 'all'] },
+        ],
+      },
+    },
+    required: ['recipient', 'message_ids'],
+  },
+};
+
+const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages'];
 
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
@@ -206,10 +256,27 @@ class Brain {
   }
 
   _getTools() {
-    const tools = [WEB_SEARCH_TOOL];
+    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL];
     if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
     if (this.canTransfer) tools.push(TRANSFER_CALL_TOOL);
     return tools;
+  }
+
+  _executeLocalTool(name, input) {
+    if (name === 'leave_message') {
+      const entry = leaveMessage(input.recipient, input.from, input.message);
+      return JSON.stringify({ success: true, id: entry.id, timestamp: entry.timestamp });
+    }
+    if (name === 'check_messages') {
+      const msgs = checkMessages(input.recipient);
+      if (msgs.length === 0) return JSON.stringify({ messages: [], summary: 'Ingen beskjeder.' });
+      return JSON.stringify({ messages: msgs });
+    }
+    if (name === 'delete_messages') {
+      const count = deleteMessages(input.recipient, input.message_ids);
+      return JSON.stringify({ deleted: count });
+    }
+    return JSON.stringify({ error: 'Unknown tool' });
   }
 
   async respond(userText) {
@@ -247,73 +314,107 @@ class Brain {
   async *respondStreaming(userText) {
     this.messages.push({ role: 'user', content: userText });
 
-    let fullResponse = '';
-    let sentenceBuffer = '';
-    let toolName = null;
-    let toolInput = '';
-    let inToolUse = false;
+    // Loop to handle local tool calls (message tools) with result feedback
+    while (true) {
+      let sentenceBuffer = '';
+      let contentBlocks = [];
+      let currentToolId = null;
+      let currentToolName = null;
+      let currentToolInput = '';
+      let textAccum = '';
 
-    try {
-      const stream = this.client.messages.stream({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: this.systemPrompt,
-        messages: this.messages,
-        tools: this._getTools(),
-      });
+      try {
+        const stream = this.client.messages.stream({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: this.systemPrompt,
+          messages: this.messages,
+          tools: this._getTools(),
+        });
 
-      for await (const event of stream) {
-        if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-          toolName = event.content_block.name;
-          toolInput = '';
-          inToolUse = true;
-        } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
-          toolInput += event.delta.partial_json;
-        } else if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
-          inToolUse = false;
-        } else if (event.type === 'content_block_delta' && event.delta?.text) {
-          sentenceBuffer += event.delta.text;
-          fullResponse += event.delta.text;
+        for await (const event of stream) {
+          if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+            // Save any accumulated text as a content block
+            if (textAccum) {
+              contentBlocks.push({ type: 'text', text: textAccum });
+              textAccum = '';
+            }
+            currentToolId = event.content_block.id;
+            currentToolName = event.content_block.name;
+            currentToolInput = '';
+          } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+            currentToolInput += event.delta.partial_json;
+          } else if (event.type === 'content_block_stop' && currentToolName) {
+            let parsedInput = {};
+            try { parsedInput = JSON.parse(currentToolInput); } catch (e) {}
+            contentBlocks.push({
+              type: 'tool_use',
+              id: currentToolId,
+              name: currentToolName,
+              input: parsedInput,
+            });
+            currentToolName = null;
+          } else if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
+            // text block starting
+          } else if (event.type === 'content_block_delta' && event.delta?.text) {
+            sentenceBuffer += event.delta.text;
+            textAccum += event.delta.text;
 
-          // Yield complete sentences for TTS (split on sentence-ending punctuation)
-          const sentenceMatch = sentenceBuffer.match(/^(.*?[.!?]+)\s*(.*)/s);
-          if (sentenceMatch) {
-            yield sentenceMatch[1].trim();
-            sentenceBuffer = sentenceMatch[2];
+            // Yield complete sentences for TTS
+            const sentenceMatch = sentenceBuffer.match(/^(.*?[.!?]+)\s*(.*)/s);
+            if (sentenceMatch) {
+              yield sentenceMatch[1].trim();
+              sentenceBuffer = sentenceMatch[2];
+            }
           }
         }
+      } catch (err) {
+        sendApiAlert('Anthropic Claude', err);
+        throw err;
       }
-    } catch (err) {
-      sendApiAlert('Anthropic Claude', err);
-      throw err;
-    }
 
-    // Yield any remaining text
-    if (sentenceBuffer.trim()) {
-      yield sentenceBuffer.trim();
-    }
+      // Yield any remaining text
+      if (sentenceBuffer.trim()) {
+        yield sentenceBuffer.trim();
+      }
+      if (textAccum) {
+        contentBlocks.push({ type: 'text', text: textAccum });
+      }
 
-    this.messages.push({ role: 'assistant', content: fullResponse });
+      // Find tool uses in this response
+      const toolUses = contentBlocks.filter((b) => b.type === 'tool_use');
 
-    // If a tool was used, yield the tool action
-    if (toolName === 'make_call' && toolInput) {
-      try {
-        const parsed = JSON.parse(toolInput);
-        if (parsed.phone_number) {
-          yield { type: 'make_call', phoneNumber: parsed.phone_number };
+      // Store assistant message
+      if (toolUses.length > 0) {
+        this.messages.push({ role: 'assistant', content: contentBlocks });
+      } else {
+        const text = contentBlocks.filter((b) => b.type === 'text').map((b) => b.text).join('');
+        this.messages.push({ role: 'assistant', content: text });
+      }
+
+      // Handle local tools (message tools) — execute and feed result back
+      const localTool = toolUses.find((t) => LOCAL_TOOLS.includes(t.name));
+      if (localTool) {
+        log.brain.info(`Tool: ${localTool.name}(${JSON.stringify(localTool.input)})`);
+        const result = this._executeLocalTool(localTool.name, localTool.input);
+        this.messages.push({
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: localTool.id, content: result }],
+        });
+        continue; // loop to get Claude's spoken response
+      }
+
+      // Handle action tools (make_call, transfer_call) — yield to server
+      const actionTool = toolUses.find((t) => t.name === 'make_call' || t.name === 'transfer_call');
+      if (actionTool) {
+        if (actionTool.name === 'make_call' && actionTool.input.phone_number) {
+          yield { type: 'make_call', phoneNumber: actionTool.input.phone_number };
+        } else if (actionTool.name === 'transfer_call' && actionTool.input.extension) {
+          yield { type: 'transfer_call', extension: actionTool.input.extension };
         }
-      } catch (e) {
-        log.brain.error(`Failed to parse make_call input: ${e.message}`);
       }
-    } else if (toolName === 'transfer_call' && toolInput) {
-      try {
-        const parsed = JSON.parse(toolInput);
-        if (parsed.extension) {
-          yield { type: 'transfer_call', extension: parsed.extension };
-        }
-      } catch (e) {
-        log.brain.error(`Failed to parse transfer_call input: ${e.message}`);
-      }
+
+      break; // no more tool loops needed
     }
   }
 
