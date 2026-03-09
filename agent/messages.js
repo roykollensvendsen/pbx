@@ -84,6 +84,20 @@ function deleteMessages(recipient, messageIds) {
   return deleted;
 }
 
+function sentMessages(from) {
+  const FAMILY = ['roy', 'cecile', 'lukas', 'alana'];
+  const results = [];
+  for (const name of FAMILY) {
+    const msgs = loadMessages(name);
+    for (const msg of msgs) {
+      if (msg.from.toLowerCase() === from.toLowerCase()) {
+        results.push({ ...msg, recipient: name });
+      }
+    }
+  }
+  return results;
+}
+
 function editMessage(recipient, messageId, newText) {
   const messages = loadMessages(recipient);
   const msg = messages.find((m) => m.id === messageId);
@@ -107,4 +121,4 @@ function messageSummary() {
   return summary;
 }
 
-module.exports = { leaveMessage, checkMessages, deleteMessages, editMessage, messageSummary };
+module.exports = { leaveMessage, checkMessages, deleteMessages, editMessage, sentMessages, messageSummary };

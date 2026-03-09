@@ -6,7 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
 const log = require('./log');
-const { leaveMessage, checkMessages, deleteMessages, editMessage, messageSummary } = require('./messages');
+const { leaveMessage, checkMessages, deleteMessages, editMessage, sentMessages, messageSummary } = require('./messages');
 
 function loadContacts() {
   try {
@@ -157,7 +157,19 @@ const EDIT_MESSAGE_TOOL = {
   },
 };
 
-const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages', 'message_summary', 'edit_message'];
+const SENT_MESSAGES_TOOL = {
+  name: 'sent_messages',
+  description: 'Vis beskjeder som en person har sendt til andre familiemedlemmer.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      from: { type: 'string', description: 'Navnet på avsenderen' },
+    },
+    required: ['from'],
+  },
+};
+
+const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages', 'message_summary', 'edit_message', 'sent_messages'];
 
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
@@ -273,7 +285,7 @@ class Brain {
   }
 
   _getTools() {
-    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL, MESSAGE_SUMMARY_TOOL, EDIT_MESSAGE_TOOL];
+    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL, MESSAGE_SUMMARY_TOOL, EDIT_MESSAGE_TOOL, SENT_MESSAGES_TOOL];
     if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
     if (this.canTransfer) tools.push(TRANSFER_CALL_TOOL);
     return tools;
@@ -302,6 +314,11 @@ class Brain {
       const msg = editMessage(input.recipient, input.message_id, input.new_message);
       if (!msg) return JSON.stringify({ error: 'Beskjeden ble ikke funnet.' });
       return JSON.stringify({ success: true, message: msg });
+    }
+    if (name === 'sent_messages') {
+      const msgs = sentMessages(input.from);
+      if (msgs.length === 0) return JSON.stringify({ messages: [], summary: 'Ingen sendte beskjeder.' });
+      return JSON.stringify({ messages: msgs });
     }
     return JSON.stringify({ error: 'Unknown tool' });
   }
