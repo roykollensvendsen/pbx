@@ -317,7 +317,7 @@ function handleConnection(socket) {
   // Send initial greeting after a short delay
   stt.on('ready', () => {
     log.server.info('Pipeline ready, sending greeting');
-    // Delay to let caller ID file be written and call settle
+    // Delay to let caller settle and hear the start of the greeting
     setTimeout(async () => {
       if (destroyed) return;
       // Re-read caller ID in case it wasn't available at connect time
@@ -358,7 +358,7 @@ function handleConnection(socket) {
       brain.messages.push({ role: 'assistant', content: greeting });
       await speakSentence(greeting);
       processing = false;
-    }, 500);
+    }, 1500);
   });
 
   // Handle incoming AudioSocket frames
