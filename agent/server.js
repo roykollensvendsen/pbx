@@ -8,8 +8,31 @@ const { DeepgramSTT } = require('./stt');
 const { Brain } = require('./brain');
 const { ElevenLabsTTS } = require('./tts');
 const { sendCallSummary, sendApiAlert } = require('./notify');
+const path = require('path');
 const { redirectChannel } = require('./ami');
 const log = require('./log');
+
+// Build reverse lookup: normalized phone number → contact name
+function loadContactsByNumber() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'contacts.json'), 'utf8');
+    const contacts = JSON.parse(raw);
+    const byNumber = {};
+    for (const [name, num] of Object.entries(contacts)) {
+      byNumber[num] = name;
+    }
+    return byNumber;
+  } catch (e) {
+    return {};
+  }
+}
+
+function normalizeNumber(num) {
+  if (!num) return num;
+  return num.replace(/^\+47/, '');
+}
+
+const contactsByNumber = loadContactsByNumber();
 
 function handleConnection(socket) {
   const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
@@ -39,9 +62,13 @@ function handleConnection(socket) {
       }
       const raw = fs.readFileSync('/tmp/agent-callerid', 'utf8').trim();
       const parts = raw.split('|');
-      callerNumber = parts[0] || null;
-      callerName = (parts[1] && parts[1] !== callerNumber) ? parts[1] : null;
+      callerNumber = normalizeNumber(parts[0]) || null;
+      callerName = (parts[1] && parts[1] !== parts[0]) ? parts[1] : null;
       callerChannel = parts[2] || null;
+      // Look up caller name from contacts if not already a useful name
+      if (callerNumber && contactsByNumber[callerNumber]) {
+        callerName = contactsByNumber[callerNumber];
+      }
       log.server.info(`Caller: ${callerName || 'unknown'} (${callerNumber || 'unknown'}) channel=${callerChannel || 'unknown'}`);
       // Remove file (may fail if owned by root — that's OK)
       try { fs.unlinkSync('/tmp/agent-callerid'); } catch (e) {}
@@ -323,7 +350,7 @@ function handleConnection(socket) {
         greeting = 'Det var dessverre ingen som svarte. Er det noe annet jeg kan hjelpe deg med?';
       } else {
         // Only greet by name if it looks like an actual person name (not "Ext 101" etc)
-        const isPersonName = callerName && !/^(ext|sip|pjsip|\d)/i.test(callerName);
+        const isPersonName = callerName && !/^(ext|sip|pjsip|\d|telenor|ingen)/i.test(callerName);
         const nameGreeting = isPersonName ? ` ${callerName}` : '';
         greeting = `Hei${nameGreeting}, dette er AI-assistenten til familien Svendsen. Hva kan jeg hjelpe deg med?`;
       }
