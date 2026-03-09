@@ -6,7 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { sendApiAlert } = require('./notify');
 const log = require('./log');
-const { leaveMessage, checkMessages, deleteMessages, messageSummary } = require('./messages');
+const { leaveMessage, checkMessages, deleteMessages, editMessage, messageSummary } = require('./messages');
 
 function loadContacts() {
   try {
@@ -143,7 +143,21 @@ const MESSAGE_SUMMARY_TOOL = {
   },
 };
 
-const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages', 'message_summary'];
+const EDIT_MESSAGE_TOOL = {
+  name: 'edit_message',
+  description: 'Endre teksten i en eksisterende beskjed. Bruk check_messages først for å finne ID-en.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      recipient: { type: 'string', description: 'Hvem beskjeden tilhører' },
+      message_id: { type: 'string', description: 'ID-en til beskjeden som skal endres' },
+      new_message: { type: 'string', description: 'Den nye teksten' },
+    },
+    required: ['recipient', 'message_id', 'new_message'],
+  },
+};
+
+const LOCAL_TOOLS = ['leave_message', 'check_messages', 'delete_messages', 'message_summary', 'edit_message'];
 
 const WEEKDAYS = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
 const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
@@ -259,7 +273,7 @@ class Brain {
   }
 
   _getTools() {
-    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL, MESSAGE_SUMMARY_TOOL];
+    const tools = [WEB_SEARCH_TOOL, LEAVE_MESSAGE_TOOL, CHECK_MESSAGES_TOOL, DELETE_MESSAGES_TOOL, MESSAGE_SUMMARY_TOOL, EDIT_MESSAGE_TOOL];
     if (this.canMakeCall) tools.push(MAKE_CALL_TOOL);
     if (this.canTransfer) tools.push(TRANSFER_CALL_TOOL);
     return tools;
@@ -283,6 +297,11 @@ class Brain {
       const summary = messageSummary();
       if (Object.keys(summary).length === 0) return JSON.stringify({ summary: 'Ingen beskjeder til noen.' });
       return JSON.stringify(summary);
+    }
+    if (name === 'edit_message') {
+      const msg = editMessage(input.recipient, input.message_id, input.new_message);
+      if (!msg) return JSON.stringify({ error: 'Beskjeden ble ikke funnet.' });
+      return JSON.stringify({ success: true, message: msg });
     }
     return JSON.stringify({ error: 'Unknown tool' });
   }

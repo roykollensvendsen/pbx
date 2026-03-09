@@ -84,6 +84,16 @@ function deleteMessages(recipient, messageIds) {
   return deleted;
 }
 
+function editMessage(recipient, messageId, newText) {
+  const messages = loadMessages(recipient);
+  const msg = messages.find((m) => m.id === messageId);
+  if (!msg) return null;
+  msg.message = newText;
+  saveMessages(recipient, messages);
+  log.brain.info(`Message ${messageId} edited for ${normalizeName(recipient)}`);
+  return msg;
+}
+
 function messageSummary() {
   const FAMILY = ['roy', 'cecile', 'lukas', 'alana'];
   const summary = {};
@@ -97,4 +107,4 @@ function messageSummary() {
   return summary;
 }
 
-module.exports = { leaveMessage, checkMessages, deleteMessages, messageSummary };
+module.exports = { leaveMessage, checkMessages, deleteMessages, editMessage, messageSummary };
