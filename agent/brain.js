@@ -82,7 +82,7 @@ const TRANSFER_CALL_TOOL = {
       extension: {
         type: 'string',
         description: 'Internnummeret (f.eks. "101")',
-        enum: ['101', '102', '103'],
+        enum: ['101', '102', '103', '105'],
       },
     },
     required: ['extension'],
@@ -93,6 +93,7 @@ const EXTENSION_DIRECTORY = {
   '101': 'Kontor',
   '102': 'Stue',
   '103': 'Garasje',
+  '105': 'Roys Mobil',
 };
 
 const LEAVE_MESSAGE_TOOL = {
